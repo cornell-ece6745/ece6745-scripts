@@ -84,7 +84,7 @@ print " Running ECE 4750 setup script"
 # increasing the count.
 
 run_init_cmds_last_ver="?"
-run_init_cmds_curr_ver="1"
+run_init_cmds_curr_ver="2"
 run_init_cmds="yes"
 if [[ -f "${HOME}/.setup-ece4750" ]]; then
   run_init_cmds_last_ver=$(tail -1 "${HOME}/.setup-ece4750")
