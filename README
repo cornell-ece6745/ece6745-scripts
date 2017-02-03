@@ -1,0 +1,10 @@
+==========================================================================
+ECE 4750 Scripts
+==========================================================================
+# Author  : Christopher Batten
+# Date    : February 2, 2017
+
+This package includes several scripts which required to use the ECE 4750
+infrastructure include setup scripts, git scripts, and other
+miscellaneous shell scripts.
+

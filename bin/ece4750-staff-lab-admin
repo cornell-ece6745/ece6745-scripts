@@ -1,0 +1,481 @@
+#!/usr/bin/env python
+#=========================================================================
+# ece4750-lab-staff-admin [options]
+#=========================================================================
+#
+#  -v --verbose                  Turn on verbose mode
+#  -h --help                     Display this message
+#
+#     --staff-github-id          Staff's (your) GitHub ID, default=moyang
+#     --password                 Staff's (your) GitHub password
+#
+#     --update-group             Update group info
+#     --update-group-github      Update group info to GitHub teams
+#
+
+# Author : Moyang Wang
+# Date   : August 19, 2015
+# [Fall16] Shunning: This script is adapted to the new ecelinux server.
+
+import argparse
+import sys
+import os
+import datetime
+import json
+import csv
+
+sys.path.append("/classes/ece4750/install/venv-pkgs/x86_64-rhel7/python2.7.12/lib/python2.7/site-packages/PyGithub-1.27.1-py2.7.egg")
+
+#-------------------------------------------------------------------------
+# Command Line Processing
+#-------------------------------------------------------------------------
+
+class ArgumentParserWithCustomError(argparse.ArgumentParser):
+  def error( self, msg = '' ):
+    if ( msg ): print('\n ERROR: %s' % msg)
+    print('')
+    file = open( sys.argv[0] )
+    for ( lineno, line ) in enumerate( file ):
+      if ( line[0] != '#' ): sys.exit(msg != '')
+      if ( (lineno == 2) or (lineno >= 4) ): print( line[1:].rstrip('\n') )
+
+def parse_cmdline():
+  p = ArgumentParserWithCustomError( add_help=False )
+
+  p.add_argument( '-v', '--verbose',             action='store_true'         )
+  p.add_argument( '-h', '--help',                action='store_true'         )
+
+  p.add_argument(       '--update-group',        action='store_true'         )
+  p.add_argument(       '--update-group-github', action='store_true'         )
+  p.add_argument(       '--staff-github-id',     default='moyang'            )
+  p.add_argument(       '--password',            default=''                  )
+
+  opts = p.parse_args()
+  if opts.help: p.error()
+  return opts
+
+opts = parse_cmdline()
+
+#-------------------------------------------------------------------------
+# Paths
+#-------------------------------------------------------------------------
+
+base_path = '/classes/ece4750/staff/'
+
+database_path      = base_path + 'database/'
+students_path      = base_path + 'students/'
+processed_req_path = base_path + 'processed-req/'
+
+student_list_file = database_path + 'student-list.txt'
+student_info_file = database_path + 'student-info.json'
+group_info_file   = database_path + 'group-info.json'
+
+group_csv_file   = database_path + 'group-info.csv'
+student_csv_file = database_path + 'student-info.csv'
+
+student_list = []
+student_name = {}                                                 
+student_info = {}
+group_info   = {}
+
+import smtplib
+import binascii
+import logging
+
+# bot
+
+logging.basicConfig(  filename=database_path+"ece4750-bot-mail.log",
+                      format='%(asctime)s %(message)s',
+                      datefmt='%m/%d/%Y %I:%M:%S %p',
+                      level = logging.INFO
+                      )
+user = "ece4750.bot"
+botpwd = None
+
+with open( base_path + "scripts/ece4750-bot-password","r") as f:
+  botpwd = (f.read())[:-1]
+
+server = None
+try:
+  server = smtplib.SMTP( "smtp.gmail.com", 587 )
+  server.ehlo()
+  server.starttls()
+  server.login( user, botpwd )
+  logging.info("  Successfully login gmail" )
+except:
+  logging.warning( "  Failed to log in to gmail" )
+
+with open( student_list_file, 'r' ) as fp:
+  student_list = [ line.rstrip('\n') for line in fp.readlines() ]
+student_list.sort()
+
+with open( student_list_file, 'r' ) as fp:
+  for line in fp.readlines():
+    strs = line.rstrip('\n').split('\t')
+
+    student_name[ strs[0] ] = strs[1]
+    student_list.append( strs[0] )
+
+student_list.sort()
+
+
+with open( student_info_file, 'r' ) as fp:
+  student_info = json.load( fp )
+
+with open( group_info_file, 'r' ) as fp:
+  group_info = json.load( fp )
+
+#-------------------------------------------------------------------------
+# Utils
+#-------------------------------------------------------------------------
+
+def find_empty_group():
+  global group_info
+  for i in sorted( group_info.keys() ):
+    if len( group_info[i] ) == 0:
+      return int(i)
+  return -1
+
+def write_student_info():
+  # write student-info.json
+  with open( student_info_file, 'w' ) as fp:
+    json.dump( student_info, fp, indent=4 )
+
+  # write student-info.csv
+  with open( student_csv_file, 'wb+' ) as fp:
+    csvw = csv.writer( fp )
+
+    csvw.writerow( ['NetID', 'GitHub ID', 'Group Num', 'Slipdays'] )
+
+    for stu, stu_entry in student_info.iteritems():
+      csvw.writerow( [ stu, stu_entry['GitHub'], stu_entry['Group'], stu_entry['Slipdays'] ] )
+
+def update_group_info():
+  global group_info
+  new_group_info = {}
+
+  for key in group_info:
+    new_group_info[int(key)] = []
+
+  for key in student_info:
+    group_id = student_info[key]['Group']
+
+    if group_id > 0:
+        new_group_info[group_id].append( key )
+
+  group_info = new_group_info
+
+def write_group_info():
+  # write group-info.json
+  with open( group_info_file, 'w' ) as fp:
+    json.dump( group_info, fp, indent=4 )
+
+  # write group-info.csv
+  with open( group_csv_file, 'wb+' ) as fp:
+    csvw = csv.writer( fp )
+
+    csvw.writerow( ['Group Num', 'Member 1', 'Member 2', 'Member 3', 'Member 4'] )
+
+    for group_id, group_mems in group_info.iteritems():
+      csvw.writerow( [group_id] + group_mems )
+
+def send_email( netid, title, kind, success=True):
+  global server
+  
+  From    = "ece4750.bot@gmail.com"
+  To      = [netid+"@cornell.edu"]
+  Cc      = ["sj634@cornell.edu"]
+  subject = "[ECE 4750] %s" % title
+  
+  text = "is processed"
+  if success:
+    text = "has been successfully processed. It may take a while before the change takes an effect"
+
+  text    = '''
+Dear {},
+
+Greetings! 
+  
+You recently submitted {} request {}.
+
+Yours Truly,
+ECE4750-bot
+'''.format( student_name[netid], kind, text )
+
+  message = "From: %s\r\n" % From \
+          + "To: %s\r\n" % ",".join(To) \
+          + "CC: %s\r\n" % ",".join(Cc) \
+          + "Subject: %s\r\n" % subject \
+          + "\r\n" \
+          + text
+  
+  try:
+    server.sendmail( From, To + Cc, message )
+  except:
+    logging.warning( "  Failed to send notification to %s" % To[0] )
+
+#-------------------------------------------------------------------------
+# Update Groups
+#-------------------------------------------------------------------------
+
+group_create_reqs  = {}
+group_join_reqs    = {}
+group_leave_reqs   = {}
+group_approve_reqs = {}
+
+finished_reqs = {}
+
+if opts.update_group:
+
+  # update GitHub ID firstly
+
+  for stu in student_list:
+    fname = students_path + '/' + stu + '/' + stu + '.githubid'
+    if os.path.exists( fname ):
+      # read first line from the github id update request
+      with open( fname, 'r' ) as fp:
+        github_id = fp.readline().rstrip()
+
+      # Update students info
+      if github_id != '':
+
+        # Retrieve the existing github id in the dictionary
+        # If not exist, return None
+        old_id = student_info[stu].get( 'GitHub' )
+  
+        if github_id != old_id:
+          student_info[stu]['GitHub'] = github_id
+
+          send_email( stu,
+                      "Github ID updated to %s" % github_id,
+                      "join-class" )
+
+  # Write updated student info
+
+  write_student_info()
+
+  # Also update status in each student's folder
+
+  for key in student_info:
+    with open( students_path + '/' + key + '/' + key + '.status', 'w' ) as fp:
+      json.dump( student_info[key], fp, indent=4 )
+
+  # Find all group update request
+
+  for stu in student_list:
+    fname = students_path + '/' + stu + '/' + stu + '.req'
+    if os.path.exists( fname ):
+      with open( fname, 'r' ) as fd:
+        req = json.load(fd)
+        if   req['req'] == 'group-create':
+          group_create_reqs[stu]  = req
+        elif req['req'] == 'group-join':
+          group_join_reqs[stu]    = req
+        elif req['req'] == 'group-approve':
+          group_approve_reqs[stu] = req
+        elif req['req'] == 'group-leave':
+          group_leave_reqs[stu]   = req
+
+  # Process all leave requests
+
+  for key, req in group_leave_reqs.iteritems():
+    old_group = student_info[key]['Group']
+    student_info[key]['Group'] = -1
+    finished_reqs[key] = req
+
+    send_email( key,
+                "You have left Group #%d" % old_group,
+                "group-leave" )
+
+  update_group_info()
+
+  # Process all create requests
+
+  for key, req in group_create_reqs.iteritems():
+    new_group = find_empty_group()
+
+    if new_group < 0:
+      send_email( key,
+                  "Cannot create a new group: no empty slot left",
+                  "group-create",
+                  False )
+    else:
+      student_info[key]['Group'] = new_group
+      update_group_info()
+
+      send_email( key,
+                  "You have created Group #%d" % new_group,
+                  "group-create" )
+
+    finished_reqs[key] = req
+    
+
+  # Process join requests
+
+  for key, req in group_join_reqs.iteritems():
+
+    join_success = False
+    group_id = int( req['args'][0] )
+
+    if group_id > 0 and group_id < len( group_info ):
+      for t in group_info[group_id]:
+        if ( ( t in group_approve_reqs ) and ( key in group_approve_reqs[t]['args'] ) ):
+          student_info[key]['Group'] = student_info[t]['Group']
+          join_success = True
+
+          send_email( t,
+                      "You have approved {}({}) to join Group #{}" 
+                        .format( key, student_name[key], group_id ),
+                      "group-approve" )
+          
+          send_email( key,
+                      "You have been approved to join Group #{}" 
+                        .format( group_id ),
+                      "group-join" )
+          break
+    if join_success:
+      finished_reqs[key] = req
+
+  update_group_info()
+
+  # Delete approve requests that are resolved
+
+  for key, req in group_approve_reqs.iteritems():
+    gid = student_info[key]['Group']
+    if gid < 0:
+      continue
+    tms = group_info[gid]
+
+    if set( req['args'] ).issubset( set( tms ) ):
+      finished_reqs[key] = req
+
+  write_student_info()
+  write_group_info()
+
+  # save processed request file
+  empty_req = {
+    'req'  : '',
+    'args' : []
+  }
+  for key, req in finished_reqs.iteritems():
+    # Dump processed requests to a file
+    if not os.path.exists( processed_req_path ):
+      os.mkdir( processed_req_path )
+    now = datetime.datetime.now()
+    with open( processed_req_path + key + '.' + now.strftime('%Y%m%d%H%M%S') + '.req', 'w' ) as fp:
+      json.dump( req, fp, indent=4 )
+    with open( students_path + '/' + key + '/' + key + '.req', 'w' ) as fp:
+      json.dump( empty_req, fp, indent=4 )
+
+  # Also update status in each student's folder
+
+  for key in student_info:
+    with open( students_path + '/' + key + '/' + key + '.status', 'w' ) as fp:
+      json.dump( student_info[key], fp, indent=4 )
+
+    # update group info for each student
+    stu_group_info = {}
+
+    if int( student_info[key]['Group'] ) in group_info:
+      tid = int( student_info[key]['Group'] )
+      stu_group_info['Teammates'] = group_info[tid]
+    with open( students_path + '/' + key + '/' + key + '-group.status', 'w' ) as fp:
+      json.dump( stu_group_info, fp, indent=4 )
+
+#-------------------------------------------------------------------------
+# Update group info to GitHub
+#-------------------------------------------------------------------------
+
+elif opts.update_group_github:
+
+  from github import Github
+  from github import GithubException
+
+  try:
+    g = Github( opts.staff_github_id, opts.password, user_agent='PyGithub' )
+    org = g.get_organization( 'cornell-ece4750' )
+    all_teams   = org.get_teams()
+    all_members = org.get_members()
+    
+  except GithubException as e:
+    logging.warning( "  Cannot connect to github!" )
+    sys.exit(0)
+  
+  logging.info( "  Start github update" )
+
+  # create a dict maps team-name to team-id
+  team_ids = {}
+  for team in all_teams:
+    team_ids[ team.name ] = team.id
+
+  # create a map from GitHub IDs to PyGithub member object
+  members_dict = {}
+  for mem in all_members:
+    members_dict[mem.login] = mem
+
+  # all students should be added to the 'students' team even if some
+  # of them don't have a group yet
+  try:
+    student_team = org.get_team( team_ids['students'] )
+  except GithubException as e:
+    pass
+
+  for stu in student_info:
+    github_id = student_info[stu]['GitHub']
+    if github_id != '':
+      if github_id in members_dict:
+        mem = members_dict[github_id]
+        try:
+          student_team.add_to_members( mem )
+        except GithubException as e:
+          pass
+      else:
+        try:
+          student_team.add_membership( g.get_user( github_id ) )
+        except GithubException as e:
+          pass
+
+  # Update GitHub team members according to group membership
+  for group_id, group_mems in group_info.iteritems():
+    team_name = 'lab-group%02d' % int( group_id )
+    try:
+      team = org.get_team( team_ids[team_name] )
+    except GithubException as e:
+      pass
+      # We firstly delete members no longer in the group from github team
+    mem_github_ids = [ student_info[x]['GitHub'] for x in group_mems ]
+    for mem in team.get_members():
+      if mem.login not in mem_github_ids:
+        team.remove_from_members( mem )
+        pass
+    # Then add user to team
+    des_strs = []
+    for net_id in group_mems:
+      github_id = student_info[net_id]['GitHub']
+      # Make sure the GitHub member is in the orgnization
+      if github_id in members_dict:
+        mem = members_dict[github_id]
+        try:
+          team.add_to_members( mem ) # ignore the error if mem is already in the team
+          des_strs.append( '%s (%s)' % ( student_name[net_id], net_id ) )
+        except GithubException as e:
+          pass
+      else:
+        # invite person to the organization, this only works with brg's fork of PyGitHub
+        try:
+          team.add_membership( g.get_user( github_id ) )
+        except GithubException as e:
+          pass
+
+    # Now we want to update descriptions of each _repo_
+    # Notice we have 1-1 mapping from repos to teams
+
+    # The description should looks like
+    # First Last (netid), First Last (netid), ...
+    try:
+      repo_name = team_name
+      repo = org.get_repo( repo_name )
+      des = ', '.join( des_strs )
+      repo.edit( repo_name, description=des )
+    except GithubException as e:
+      pass

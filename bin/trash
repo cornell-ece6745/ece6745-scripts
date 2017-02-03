@@ -1,0 +1,61 @@
+#!/bin/bash
+#=========================================================================
+# trash [options]
+#=========================================================================
+#
+#  -h  Display this message
+#  -v  Verbose mode
+#
+# Instead of removing files, it is safer to "trash" them by moving them
+# into a temporary subdirectory of your home directory. Files are
+# organized in date-labelled subdirectories to make it easy to delete
+# "old" files.
+#
+# Author : Christopher Batten
+# Date   : December 9, 2011
+
+set -e
+
+#-------------------------------------------------------------------------
+# Command line parsing
+#-------------------------------------------------------------------------
+
+function usage
+{
+  echo ""
+  sed -n '3p' $0 | sed -e 's/#//'
+  sed -n '5,/^$/p' $0 | sed -e 's/#//'
+  exit 1
+}
+
+verbose=no
+while getopts "hvr" OPTION; do
+  case $OPTION in
+    v)   verbose=yes ;;
+    h|?) usage ;;
+  esac
+done
+
+#-------------------------------------------------------------------------
+# Main
+#-------------------------------------------------------------------------
+
+# Trash subdirectory
+
+trash_dir="${HOME}/tmp/trash/$(date '+%Y-%m-%d')"
+
+# Create the subdirectory if it doesn't exist
+
+mkdir -p "${trash_dir}"
+
+# Move the file(s) into the new trash directory, create unique numbered
+# copies if file already exists in the trash directory
+
+for file; do
+  if [[ -e "${file}" ]]; then
+    mv --backup=numbered "${file}" "${trash_dir}"
+  fi
+done
+
+exit 0
+

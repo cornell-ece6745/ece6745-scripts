@@ -1,0 +1,278 @@
+#!/usr/bin/env python
+#=========================================================================
+# ece4750-lab-admin [options]
+#=========================================================================
+#
+#  -v --verbose                           Turn on verbose mode
+#  -h --help                              Display this message
+#  -s --status                            Check current status
+#     --join-class [GitHub ID]            Update your GitHub ID
+#     --make-request [request] [argument]
+#                                         Make a request, choice =
+#                                           ( group-create, group-join,
+#                                             group-approve, group-leave )
+#     --cancel-request                    Cancel pending request
+#
+# ece4750 lab management tool. Before makeing any request, please use
+# --join-class [GitHub ID] command to submit your GitHub ID. This is
+# required for this class.
+#
+
+# Author : Moyang Wang
+# Date   : August 19, 2015
+# [Fall16] Shunning: This script is adapted to the new ecelinux server.
+
+import argparse
+import sys
+import os
+import datetime
+import json
+import getpass
+
+#-------------------------------------------------------------------------
+# Command Line Processing
+#-------------------------------------------------------------------------
+
+class ArgumentParserWithCustomError(argparse.ArgumentParser):
+  def error( self, msg = '' ):
+    if ( msg ): print('\n ERROR: %s' % msg)
+    print('')
+    file = open( sys.argv[0] )
+    for ( lineno, line ) in enumerate( file ):
+      if ( line[0] != '#' ): sys.exit(msg != '')
+      if ( (lineno == 2) or (lineno >= 4) ): print( line[1:].rstrip('\n') )
+
+def parse_cmdline():
+  p = ArgumentParserWithCustomError( add_help=False )
+
+  p.add_argument( '-v', '--verbose',         action='store_true'  )
+  p.add_argument( '-h', '--help',            action='store_true'  )
+  p.add_argument( '-s', '--status',          action='store_true'  )
+  p.add_argument(       '--join-class',      default=''           )
+
+  p.add_argument(       '--make-request',    nargs = '+'          )
+  p.add_argument(       '--request-args',    default=''           )
+  p.add_argument(       '--cancel-request',  action='store_true'  )
+
+  # for testing ONLY
+  # p.add_argument(       '--login-as',        default=''           )
+
+  opts = p.parse_args()
+  if opts.help: p.error()
+  return opts
+
+opts = parse_cmdline()
+
+#-------------------------------------------------------------------------
+# Paths
+#-------------------------------------------------------------------------
+
+user = getpass.getuser()
+
+# if opts.login_as:
+  # user = opts.login_as
+
+base_path = '/classes/ece4750/'
+student_path = base_path + 'students/' + user + '/'
+
+req_file       = student_path + user + '.req'
+status_file    = student_path + user + '.status'
+group_file     = student_path + user + '-group.status'
+github_id_file = student_path + user + '.githubid'
+
+
+#-------------------------------------------------------------------------
+# Init
+#-------------------------------------------------------------------------
+
+# Check if the student is in the list
+
+if not os.path.exists( status_file ):
+  print '''
+Unable to recognize your NetID, please make sure you logged in using your NetID and you are enrolled in ece4750.
+Otherwise, you may need to contact course staff (sj634@cornell.edu) for help.
+  '''
+  sys.exit(0)
+
+# Load current status
+
+my_info       = {}
+my_req        = {}
+my_group_info = {}
+
+with open( status_file, 'r' ) as fp:
+  my_info = json.load( fp )
+
+with open( req_file, 'r' ) as fp:
+  my_req = json.load( fp )
+
+with open( group_file, 'r' ) as fp:
+  my_group_info = json.load( fp )
+
+group_id  = my_info['Group']
+github_id = my_info['GitHub']
+slipdays  = my_info['Slipdays']
+
+#-------------------------------------------------------------------------
+# Check status
+#-------------------------------------------------------------------------
+
+if opts.status:
+  # current status
+  print ''
+  print 'Your NetID is %s.' % user
+
+  if github_id == '':
+    print 'You have not set up your GitHub ID yet.'
+    print 'You MUST set up your GitHub ID before making any request.'
+    print ''
+  else:
+    print 'Your GitHub ID is %s.' % github_id
+  # print 'You have %d slipday(s) left.' % slipdays
+
+  if group_id == -1:
+    print 'You currently do NOT have a group!'
+  else:
+    print 'You are a member of Group %d. ' % group_id
+    print ''
+    print 'Current members in your group:'
+    for m in sorted( my_group_info['Teammates'] ):
+      print '  ' + m
+
+  # pending request
+  print ''
+  if my_req['req'] == 'group-create':
+    print 'You have made a request to create a group, it is still pending.'
+  elif my_req['req'] == 'group-leave':
+    print 'You have made a request to leave your current group, it is still pending.'
+  elif my_req['req'] == 'group-join':
+    print 'You have made a request to join group %d, it is still pending for approval from a current group member.' % int( my_req['args'][0] )
+  elif my_req['req'] == 'group-approve':
+    print 'You have made a request to approve the following member(s) to join your group:'
+    for mem in my_req['args']:
+      print mem
+  else:
+    print 'You do not have any pending request.'
+  print ''
+  sys.exit(0)
+
+#-------------------------------------------------------------------------
+# Make a new request
+#-------------------------------------------------------------------------
+
+req_dict = {}
+req_made = False
+
+if opts.make_request:
+
+  req_command = opts.make_request[0]
+  req_args    = []
+
+  if len( opts.make_request ) > 1:
+    req_args = opts.make_request[1]
+
+  # students cannot make any request unless they've updated their GitHub id.
+  if my_info['GitHub'] == '':
+    print ''
+    print 'You have not setup your GitHub ID yet.'
+    print 'You must setup your GitHub ID using --join-class command, followed by your GitHub ID.'
+    print 'You cannot make any request unless have your GitHub ID set up.'
+    sys.exit(0)
+
+  if my_req['req'] != '':
+    print ''
+    print 'You have a pending request not been processed yet.'
+    print 'You must cancel your current request before making a new one.'
+    print 'use --status to check your current status and pending request.'
+    sys.exit(0)
+  else:
+    if req_command == 'group-create':
+      if group_id > 0:
+        print 'You are currently a member of Group %d .' % group_id
+        print 'You must leave your current group before creating a new one.'
+      else:
+        req_dict['req']  = 'group-create'
+        req_dict['args'] = []
+        req_made = True
+    elif req_command == 'group-leave':
+      if group_id < 0:
+        print 'You are not in any group.'
+      else:
+        req_dict['req']  = 'group-leave'
+        req_dict['args'] = []
+        req_made = True
+    elif req_command == 'group-join':
+      if group_id > 0:
+        print 'You must leave your current group before joining a new one.'
+      else:
+        req_dict['req']  = 'group-join'
+        if req_args != []:
+          if req_args.strip().isdigit():
+            req_dict['args'] = [ req_args.strip() ]
+            req_made = True
+          else:
+            print 'You must provide a valid group number to join.'
+        else:
+          print 'You must provide a valid group number to join.'
+    elif req_command == 'group-approve':
+      if group_id < 0:
+        print 'You are not in any group.'
+      elif req_args == []:
+        print 'You have to provide members you would like to approve to join your group.'
+      else:
+        req_dict['req']  = 'group-approve'
+        req_dict['args'] = sorted( [x.strip() for x in req_args.split(',')] )
+        req_made = True
+    else:
+      print ''
+      print 'Invalid request type.'
+      print 'Choose from [group-create, group-leave, group-join, group-approve].'
+      print 'Use --help for more information.'
+      print ''
+
+    if req_made:
+      # Write request to file
+      with open( req_file, 'w' ) as fp:
+        json.dump( req_dict, fp, indent=4 )
+      print ''
+      print 'Your request was saved.'
+      print 'It may take several minutes to process request you just made. Please check your status regularly using --status command, or wait for email notification.'
+      print 'Also, it takes a bit longer to update group info on the GitHub. Be patient.'
+      print ''
+      sys.exit(0)
+    else:
+      print ''
+      print 'Your request was not saved.'
+      print ''
+      sys.exit(0)
+
+#-------------------------------------------------------------------------
+# Cancel pending request
+#-------------------------------------------------------------------------
+
+empty_req = {}
+empty_req['req']  = ''
+empty_req['args'] = []
+
+if opts.cancel_request:
+  with open( req_file, 'w' ) as fp:
+    json.dump( empty_req, fp, indent=4 )
+  print ''
+  print 'Your request was canceled.'
+  print ''
+  sys.exit(0)
+
+#-------------------------------------------------------------------------
+# Update GitHub ID (join class)
+#-------------------------------------------------------------------------
+
+if opts.join_class:
+  with open( github_id_file, 'w' ) as fp:
+    fp.write( opts.join_class )
+  print ''
+  print 'Your GitHub ID was submitted.'
+  print 'You will receive an email from the GitHub, inviting you to join the cornell-ece4750 organization.'
+  print 'You need to accept that invitation to be able to join groups on GitHub'
+  print ''
+  sys.exit(0)
+

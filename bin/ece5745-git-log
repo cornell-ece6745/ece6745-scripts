@@ -1,0 +1,84 @@
+#!/bin/bash
+#=========================================================================
+# ece5745-git-log [options] [git-log-options]
+#=========================================================================
+#
+#  -h  Display this message
+#  -r  List reference names (eg. tags, branches, etc)
+#
+# Displays a compact log format with one commit per line and a graph
+# representing the commit history. This script passes along whatever the
+# additional options are straight onto git log. Currently the script
+# uses a .mailmap file to convert full commit author names into a
+# compact three letter abbreviation. A .mailmap file can be placed in
+# your home directory and should be of the format:
+#
+#  cfb <cbatten@mit.edu>
+#
+# You might also need to add this to your ~/.gitconfig so that git knows
+# where to find the mailmap file.
+#
+#  [mailmap]
+#    file = /u/cbatten/.mailmap
+#
+# Here is a simple example of the log output.
+#
+#  *   09a9ec5 cfb Merge branch 'upstream'
+#  |\
+#  | * 8f4476f cfb Upgrade to mcppbs-0.0-20-ge71ad83
+#  * | 6d8fb08 cfb Rename project to mips-sim-isa
+#  * | b12f8e8 cfb Initial import
+#  |/
+#  * dc9861f cfb Import from mcppbs-0.0-18-g6048bc6
+#
+# Author : Christopher Batten
+# Date   : August 18, 2009
+
+set -e
+
+#-------------------------------------------------------------------------
+# Command line parsing
+#-------------------------------------------------------------------------
+
+function usage
+{
+  echo ""
+  sed -n '3p' $0 | sed -e 's/#//'
+  sed -n '5,/^$/p' $0 | sed -e 's/#//'
+  exit 1
+}
+
+verbose=no
+references=no
+while getopts ":hvr" OPTION; do
+  case $OPTION in
+    r) references=yes ;;
+    h) usage ;;
+  esac
+done
+
+# Remove -r option
+opts=`echo "$@" | sed s/-r//`
+
+#-------------------------------------------------------------------------
+# Main
+#-------------------------------------------------------------------------
+
+pretty_str="%C(yellow)%h%Creset %C(blue)%aN%Creset %s"
+if ( test ${references} = "yes" ); then
+  pretty_str="${pretty_str}%C(cyan)%d%Creset"
+fi
+
+# If showing references don't truncate, otherwise truncate with less
+
+if ( test ${references} = "yes" ); then
+  git log -10 --graph --pretty="tformat:${pretty_str}" ${opts} \
+    | sed 's|refs/heads/||g; s|refs/remotes/||g; s|refs/tags/|tags/|'
+else
+  git log -10 --graph --pretty="tformat:${pretty_str}" ${opts} \
+    | sed 's|refs/heads/||g; s|refs/remotes/||g; s|refs/tags/|tags/|' \
+    | less -FERSX
+fi
+
+exit 0
+

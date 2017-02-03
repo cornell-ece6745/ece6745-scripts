@@ -1,0 +1,203 @@
+#=========================================================================
+# Toplevel Makefile for the ECE 4750 Scripts
+#=========================================================================
+
+install_exes = \
+  $(src_dir)/bin/setup-ece4750.sh \
+  $(src_dir)/bin/ece4750-git-status \
+  $(src_dir)/bin/ece4750-git-add \
+  $(src_dir)/bin/ece4750-git-log \
+  $(src_dir)/bin/trash \
+  $(src_dir)/bin/ece4750-lab-admin \
+  $(src_dir)/bin/ece4750-staff-lab-admin \
+  $(src_dir)/bin/ece4750-travis-status \
+
+install_etcs = \
+  $(src_dir)/etc/ece4750-git-config \
+
+#-------------------------------------------------------------------------
+# Basic setup
+#-------------------------------------------------------------------------
+
+# Remove all default implicit rules since they can cause subtle bugs
+# and they just make things run slower
+.SUFFIXES:
+% : %,v
+% : RCS/%,v
+% : RCS/%
+% : s.%
+% : SCCS/s.%
+
+# Default is to build the prereqs of the all target (defined at bottom)
+default : all
+.PHONY : default
+
+project_name := @PACKAGE_TARNAME@
+src_dir      := @srcdir@
+scripts_dir  := $(src_dir)/scripts
+
+# If the version information is not in the configure script, then we
+# assume that we are in a working directory. We use the vcs-version.sh
+# script in the scripts directory to generate an appropriate version
+# string. Currently the way things are setup we have to run this script
+# everytime we run make so the script needs to be as fast as possible.
+
+ifeq (@PACKAGE_VERSION@,?)
+  project_ver:=$(shell $(scripts_dir)/vcs-version.sh $(src_dir))
+else
+  project_ver:=@PACKAGE_VERSION@
+endif
+
+# Installation
+
+prefix      := @prefix@
+enable_stow := @enable_stow@
+
+ifeq ($(enable_stow),yes)
+  stow_pkg_dir := $(prefix)/pkgs
+  DESTDIR ?= $(stow_pkg_dir)/$(project_name)-$(project_ver)
+else
+  DESTDIR ?= $(prefix)
+endif
+
+install_exes_dir := $(DESTDIR)/bin
+install_etcs_dir := $(DESTDIR)/etc
+
+MKINSTALLDIRS := $(scripts_dir)/mk-install-dirs.sh
+INSTALL       := @INSTALL@
+INSTALL_HDR   := $(INSTALL) -m 444
+INSTALL_ETC   := $(INSTALL) -m 444
+INSTALL_LIB   := $(INSTALL) -m 644
+INSTALL_EXE   := $(INSTALL) -m 555
+STOW          := @stow@
+
+#-------------------------------------------------------------------------
+# Installation
+#-------------------------------------------------------------------------
+
+install-exes : $(install_exes)
+	$(MKINSTALLDIRS) $(install_exes_dir)
+	for file in $(install_exes); \
+  do \
+    $(INSTALL_EXE) $$file $(install_exes_dir); \
+  done
+
+# Just deal with this install manually for now
+
+install-etcs : $(install_etcs)
+	$(MKINSTALLDIRS) $(DESTDIR)/etc
+	$(MKINSTALLDIRS) $(DESTDIR)/etc/gitconfig.d
+	$(INSTALL_ETC) $(src_dir)/etc/ece4750-git-config \
+                 $(DESTDIR)/etc/gitconfig.d
+
+install : install-exes install-etcs
+ifeq ($(enable_stow),yes)
+	$(MKINSTALLDIRS) $(stow_pkg_dir)
+	cd $(stow_pkg_dir) && \
+    ls -d $(project_name)-* | xargs -n 1 $(STOW) --delete && \
+    $(STOW) $(project_name)-$(project_ver)
+endif
+
+.PHONY : install install-exes install-etcs
+
+#-------------------------------------------------------------------------
+# Regenerate configure information
+#-------------------------------------------------------------------------
+
+configure_prereq = \
+  $(src_dir)/configure.ac \
+  $(src_dir)/aclocal.m4 \
+
+$(src_dir)/configure : $(configure_prereq)
+	cd $(src_dir) && autoconf
+
+config.status : $(src_dir)/configure
+	./config.status --recheck
+
+Makefile : 	$(src_dir)/Makefile.in config.status
+	./config.status
+
+dist_junk += config.status config.h Makefile config.log
+
+#-------------------------------------------------------------------------
+# Distribution
+#-------------------------------------------------------------------------
+# The distribution tarball is named project-ver.tar.gz and it includes
+# both enabled and disabled subprojects.
+
+dist_files = \
+  $(sprojs) \
+  README \
+  aclocal.m4 \
+  configure.ac \
+  configure \
+  Makefile.in \
+  bin \
+  etc \
+  scripts \
+
+dist_dir := $(project_name)-$(project_ver)
+dist_tgz := $(project_name)-$(project_ver).tar.gz
+
+# Notice that when we make the distribution we rewrite the configure.ac
+# script with the current version and we rerun autoconf in the new
+# source directory so that the distribution will have the proper version
+# information. We also rewrite the "Version : " line in the README.
+
+dist :
+	rm -rf $(dist_dir)
+	mkdir $(dist_dir)
+	tar -C $(src_dir) -cf - $(dist_files) | tar -C $(dist_dir) -xpf -
+	sed -i.bak 's/^\(# Version :\).*/\1 $(project_ver)/' $(dist_dir)/README
+	sed -i.bak 's/\( proj_version,\).*/\1 [$(project_ver)])/' $(dist_dir)/configure.ac
+	cd $(dist_dir) && \
+    autoconf && \
+    rm -rf autom4te.cache configure.ac.bak README.bak
+	tar -czvf $(dist_tgz) $(dist_dir)
+	rm -rf $(dist_dir)
+
+# You can use the distcheck target to try untarring the distribution and
+# then running configure, make, make check, and make distclean. A
+# "directory is not empty" error means distclean is not removing
+# everything.
+
+distcheck : dist
+	rm -rf $(dist_dir)
+	tar -xzvf $(dist_tgz)
+	mkdir -p $(dist_dir)/build
+	cd $(dist_dir)/build; ../configure; make; make check; make distclean
+	rm -rf $(dist_dir)
+
+junk += $(project_name)-*.tar.gz
+
+.PHONY : dist distcheck
+
+#-------------------------------------------------------------------------
+# Default
+#-------------------------------------------------------------------------
+
+all : $(install_exes)
+.PHONY : all
+
+#-------------------------------------------------------------------------
+# Makefile debugging
+#-------------------------------------------------------------------------
+# This handy rule will display the contents of any make variable by
+# using the target debug-<varname>. So for example, make debug-junk will
+# display the contents of the junk variable.
+
+debug-% :
+	@echo $* = $($*)
+
+#-------------------------------------------------------------------------
+# Clean up junk
+#-------------------------------------------------------------------------
+
+clean :
+	rm -rf *~ \#* $(junk)
+
+distclean :
+	rm -rf *~ \#* $(junk) $(dist_junk)
+
+.PHONY : clean distclean
+
