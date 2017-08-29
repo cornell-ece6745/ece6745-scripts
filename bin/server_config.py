@@ -14,7 +14,7 @@ class server_config():
     self.utils_port  = 2048
     self.server_addr = 'ecelinux-01.ece.cornell.edu'
 
-    self.superusers  = [ 'ka429', 'eu49' ]
+    self.superusers  = [ 'ka429' ]
 
   def getSU( self ):
     return self.superusers

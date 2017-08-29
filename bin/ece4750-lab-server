@@ -108,17 +108,31 @@ import logging
 
 # Database/lists loading
 
-with open( student_list_file, 'r' ) as fp:
-  for line in fp.readlines():
-    strs = line.rstrip('\n').split('\t')
+init_db_dirty = False
 
-    student_name[ strs[0] ] = strs[1]
+student_name = {}
+if os.path.exists( student_list_file ):
+  with open( student_list_file, 'r' ) as fp:
+    for line in fp.readlines():
+      strs = line.rstrip('\n').split('\t')
+  
+      student_name[ strs[0] ] = strs[1]
+else:
+  init_db_dirty = init_db_dirty | True
 
-with open( student_info_file, 'r' ) as fp:
-  student_info = json.load( fp )
+student_info = {}
+if os.path.exists( student_info_file ):
+  with open( student_info_file, 'r' ) as fp:
+    student_info = json.load( fp )
+else:
+  init_db_dirty = init_db_dirty | True
 
-with open( group_info_file, 'r' ) as fp:
-  group_info = json.load( fp )
+group_info = {}
+if os.path.exists( group_info_file ):
+  with open( group_info_file, 'r' ) as fp:
+    group_info = json.load( fp )
+else:
+  init_db_dirty = init_db_dirty | True
 
 #-------------------------------------------------------------------------
 # Utils
@@ -274,7 +288,7 @@ num_updaters = 0
 group_lock   = threading.Lock()
 counter_lock = threading.Lock()
 
-db_dirty        = False
+db_dirty        = init_db_dirty
 server_shutdown = False
 stall_requests  = False
 reset_db        = False
@@ -562,6 +576,51 @@ def assign_github_id ( netid, github_id ):
     msg = 'Invalid GitHub ID "{}"'.format( github_id )
 
   # Return
+  return ( ret, msg )
+
+#=========================================
+# Initialize repos
+#=========================================
+def init_repos ( ):
+
+  # Globals
+  global group_lock
+  global student_info
+  global group_info
+  global db_dirty
+
+  global github_obj
+  global course_org
+  global generic_team
+  global groups_teams
+
+  # Delete all repos
+  for gid in xrange(1, 41):
+    group_id = str(gid)
+    group_name = 'lab-group{:02d}'.format( int( group_id ) )
+    try:
+      repo = course_org.get_repo( group_name )
+      repo.delete()
+    except:
+      pass
+
+  # Generate new repos
+  for gid in xrange(1, 41):
+    group_id = str(gid)
+    group_name = 'lab-group{:02d}'.format( int( group_id ) )
+    try:
+      repo = course_org.create_repo( group_name, private = True )
+      team = groups_teams[group_name]
+      team.edit( group_name, permission='push' )
+      team.add_to_repos( repo )
+      update_group_description( group_id )
+    except:
+      pass
+
+  # All is well ...
+  ret = 0
+  msg = 'All repos were initialized correctly.'
+
   return ( ret, msg )
 
 #=========================================
@@ -1150,6 +1209,14 @@ def execute_command( netid, cmd, args ):
         else:
           ret = -7
           msg = 'Not enough arguments supplied for "server setup"'
+
+      # Initialize group repos
+      elif args[0] == 'init_repos':
+        if server_started:
+          ret, msg = init_repos()
+        else:
+          ret = -10
+          msg = 'Server needs to be setup for this operation'
 
       # Not defined
       else:
