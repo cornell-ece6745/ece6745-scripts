@@ -8,8 +8,10 @@ install_exes = \
   $(src_dir)/bin/ece4750-git-add \
   $(src_dir)/bin/ece4750-git-log \
   $(src_dir)/bin/trash \
+  $(src_dir)/bin/server_config.py \
   $(src_dir)/bin/ece4750-lab-admin \
-  $(src_dir)/bin/ece4750-staff-lab-admin \
+  $(src_dir)/bin/ece4750-lab-server \
+  $(src_dir)/bin/ece4750-lab-server-utils \
   $(src_dir)/bin/ece4750-travis-status \
 
 install_etcs = \
