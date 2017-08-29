@@ -18,9 +18,12 @@
 # required for this class.
 #
 
-# Author : Moyang Wang
-# Date   : August 19, 2015
-# [Fall16] Shunning: This script is adapted to the new ecelinux server.
+# Author : Khalid Al-Hawaj
+# Date   : August 25, 2017
+#
+# Based off of Moyang's script. Though, this was heavly changed to adapt
+# to a proper inter-process communication rather than depending on shared
+# file reads and writes
 
 import argparse
 import sys
@@ -28,6 +31,7 @@ import os
 import datetime
 import json
 import getpass
+import socket
 
 #-------------------------------------------------------------------------
 # Command Line Processing
@@ -50,12 +54,10 @@ def parse_cmdline():
   p.add_argument( '-s', '--status',          action='store_true'  )
   p.add_argument(       '--join-class',      default=''           )
 
+  p.add_argument(       '--server',          nargs = '+'          )
+  p.add_argument(       '--github',          nargs = '+'          )
   p.add_argument(       '--make-request',    nargs = '+'          )
-  p.add_argument(       '--request-args',    default=''           )
-  p.add_argument(       '--cancel-request',  action='store_true'  )
-
-  # for testing ONLY
-  # p.add_argument(       '--login-as',        default=''           )
+  p.add_argument(       '--group',           nargs = '+'          )
 
   opts = p.parse_args()
   if opts.help: p.error()
@@ -64,215 +66,166 @@ def parse_cmdline():
 opts = parse_cmdline()
 
 #-------------------------------------------------------------------------
-# Paths
+# Constants
 #-------------------------------------------------------------------------
 
-user = getpass.getuser()
+from server_config import server_config
 
-# if opts.login_as:
-  # user = opts.login_as
-
-base_path = '/classes/ece4750/'
-student_path = base_path + 'students/' + user + '/'
-
-req_file       = student_path + user + '.req'
-status_file    = student_path + user + '.status'
-group_file     = student_path + user + '-group.status'
-github_id_file = student_path + user + '.githubid'
-
+configs = server_config()
 
 #-------------------------------------------------------------------------
-# Init
+# Connection utilities
 #-------------------------------------------------------------------------
 
-# Check if the student is in the list
+def send_data ( sock, data, drastic = True ):
 
-if not os.path.exists( status_file ):
-  print '''
-Unable to recognize your NetID, please make sure you logged in using your NetID and you are enrolled in ece4750.
-Otherwise, you may need to contact course staff (sj634@cornell.edu) for help.
-  '''
-  sys.exit(0)
+  # Assume data is ASCII
+  length = len( data )
+  new_data = '{:04d}{}'.format( length, data )
 
-# Load current status
+  # Send the packet
+  try:
+    sock.sendall( new_data )
+  except:
+    print 'ERROR: cannot send data'
+    if drastic:
+      sock.close()
+      quit ( -1 )
+    else:
+      pass
 
-my_info       = {}
-my_req        = {}
-my_group_info = {}
+def recv_data ( sock, drastic = False ):
 
-with open( status_file, 'r' ) as fp:
-  my_info = json.load( fp )
+  # Again, data is text :)
+  data = None
 
-with open( req_file, 'r' ) as fp:
-  my_req = json.load( fp )
+  try:
+    # Get packet length
+    tmp = sock.recv( 4 )
+    length = int( tmp )
+    data = sock.recv( length )
+  except:
+    if drastic:
+      sock.close()
+      quit ( -1 )
+    else:
+      pass
 
-with open( group_file, 'r' ) as fp:
-  my_group_info = json.load( fp )
-
-group_id  = my_info['Group']
-github_id = my_info['GitHub']
-slipdays  = my_info['Slipdays']
+  return data
 
 #-------------------------------------------------------------------------
-# Check status
+# Socket
 #-------------------------------------------------------------------------
+
+# Connect to a service in the same server it is coming from
+sock = None
+
+try:
+  sock = socket.create_connection(( configs.server_addr, configs.server_port ))
+except:
+  print 'ERROR: cannot connect to server'
+  quit ( -1 )
+
+#-------------------------------------------------------------------------
+# Specify request
+#-------------------------------------------------------------------------
+
+res_raw = None
 
 if opts.status:
-  # current status
-  print ''
-  print 'Your NetID is %s.' % user
+  # Send request
+  req = 'status'
+  send_data( sock, req )
 
-  if github_id == '':
-    print 'You have not set up your GitHub ID yet.'
-    print 'You MUST set up your GitHub ID before making any request.'
-    print ''
-  else:
-    print 'Your GitHub ID is %s.' % github_id
-  # print 'You have %d slipday(s) left.' % slipdays
-
-  if group_id == -1:
-    print 'You currently do NOT have a group!'
-  else:
-    print 'You are a member of Group %d. ' % group_id
-    print ''
-    print 'Current members in your group:'
-    for m in sorted( my_group_info['Teammates'] ):
-      print '  ' + m
-
-  # pending request
-  print ''
-  if my_req['req'] == 'group-create':
-    print 'You have made a request to create a group, it is still pending.'
-  elif my_req['req'] == 'group-leave':
-    print 'You have made a request to leave your current group, it is still pending.'
-  elif my_req['req'] == 'group-join':
-    print 'You have made a request to join group %d, it is still pending for approval from a current group member.' % int( my_req['args'][0] )
-  elif my_req['req'] == 'group-approve':
-    print 'You have made a request to approve the following member(s) to join your group:'
-    for mem in my_req['args']:
-      print mem
-  else:
-    print 'You do not have any pending request.'
-  print ''
-  sys.exit(0)
-
-#-------------------------------------------------------------------------
-# Make a new request
-#-------------------------------------------------------------------------
-
-req_dict = {}
-req_made = False
-
-if opts.make_request:
-
-  req_command = opts.make_request[0]
-  req_args    = []
-
-  if len( opts.make_request ) > 1:
-    req_args = opts.make_request[1]
-
-  # students cannot make any request unless they've updated their GitHub id.
-  if my_info['GitHub'] == '':
-    print ''
-    print 'You have not setup your GitHub ID yet.'
-    print 'You must setup your GitHub ID using --join-class command, followed by your GitHub ID.'
-    print 'You cannot make any request unless have your GitHub ID set up.'
-    sys.exit(0)
-
-  if my_req['req'] != '':
-    print ''
-    print 'You have a pending request not been processed yet.'
-    print 'You must cancel your current request before making a new one.'
-    print 'use --status to check your current status and pending request.'
-    sys.exit(0)
-  else:
-    if req_command == 'group-create':
-      if group_id > 0:
-        print 'You are currently a member of Group %d .' % group_id
-        print 'You must leave your current group before creating a new one.'
-      else:
-        req_dict['req']  = 'group-create'
-        req_dict['args'] = []
-        req_made = True
-    elif req_command == 'group-leave':
-      if group_id < 0:
-        print 'You are not in any group.'
-      else:
-        req_dict['req']  = 'group-leave'
-        req_dict['args'] = []
-        req_made = True
-    elif req_command == 'group-join':
-      if group_id > 0:
-        print 'You must leave your current group before joining a new one.'
-      else:
-        req_dict['req']  = 'group-join'
-        if req_args != []:
-          if req_args.strip().isdigit():
-            req_dict['args'] = [ req_args.strip() ]
-            req_made = True
-          else:
-            print 'You must provide a valid group number to join.'
-        else:
-          print 'You must provide a valid group number to join.'
-    elif req_command == 'group-approve':
-      if group_id < 0:
-        print 'You are not in any group.'
-      elif req_args == []:
-        print 'You have to provide members you would like to approve to join your group.'
-      else:
-        req_dict['req']  = 'group-approve'
-        req_dict['args'] = sorted( [x.strip() for x in req_args.split(',')] )
-        req_made = True
-    else:
-      print ''
-      print 'Invalid request type.'
-      print 'Choose from [group-create, group-leave, group-join, group-approve].'
-      print 'Use --help for more information.'
-      print ''
-
-    if req_made:
-      # Write request to file
-      with open( req_file, 'w' ) as fp:
-        json.dump( req_dict, fp, indent=4 )
-      print ''
-      print 'Your request was saved.'
-      print 'It may take several minutes to process request you just made. Please check your status regularly using --status command, or wait for email notification.'
-      print 'Also, it takes a bit longer to update group info on the GitHub. Be patient.'
-      print ''
-      sys.exit(0)
-    else:
-      print ''
-      print 'Your request was not saved.'
-      print ''
-      sys.exit(0)
-
-#-------------------------------------------------------------------------
-# Cancel pending request
-#-------------------------------------------------------------------------
-
-empty_req = {}
-empty_req['req']  = ''
-empty_req['args'] = []
-
-if opts.cancel_request:
-  with open( req_file, 'w' ) as fp:
-    json.dump( empty_req, fp, indent=4 )
-  print ''
-  print 'Your request was canceled.'
-  print ''
-  sys.exit(0)
-
-#-------------------------------------------------------------------------
-# Update GitHub ID (join class)
-#-------------------------------------------------------------------------
+  # Get response
+  res_raw = recv_data( sock )
 
 if opts.join_class:
-  with open( github_id_file, 'w' ) as fp:
-    fp.write( opts.join_class )
-  print ''
-  print 'Your GitHub ID was submitted.'
-  print 'You will receive an email from the GitHub, inviting you to join the cornell-ece4750 organization.'
-  print 'You need to accept that invitation to be able to join groups on GitHub'
-  print ''
-  sys.exit(0)
+  # Send request
+  req = 'github\nset\n{}'.format( opts.join_class )
+  send_data( sock, req )
 
+  # Get response
+  res_raw = recv_data( sock )
+
+if opts.github:
+  # Get command and argument
+  cmd = opts.github[0]
+  args = ''
+  if len( opts.github ) > 1:
+    args = opts.github[1]
+
+  # Send request
+  req = 'github\n{}\n{}'.format( cmd, args )
+  send_data( sock, req )
+
+  # Get resposne
+  res_raw = recv_data( sock )
+
+if opts.group:
+  # Get command and argument
+  cmd = opts.group[0]
+  args = ''
+  if len( opts.group ) > 1:
+    args = '\n'.join( opts.group[1:] )
+
+  # Send request
+  req = 'group\n{}\n{}'.format( cmd, args )
+  send_data( sock, req )
+
+  # Get resposne
+  res_raw = recv_data( sock )
+
+if opts.server:
+  # Get command and argument
+  cmd = opts.server[0]
+  args = ''
+  if len( opts.server ) > 1:
+    args = '\n'.join( opts.server[1:] )
+
+  if cmd == 'setup':
+    print ''
+    username = raw_input      ('  Username : ')
+    pwd      = getpass.getpass('  Password : ')
+    print ''
+
+    # Arguments
+    args = '{}\n{}'.format( username, pwd )
+
+  # Send request
+  req = 'server\n{}\n{}'.format( cmd, args )
+  send_data( sock, req )
+
+  # Get resposne
+  res_raw = recv_data( sock )
+
+#-------------------------------------------------------------------------
+# Finish up
+#-------------------------------------------------------------------------
+
+# Clean up connections
+sock.close()
+
+# Parse the response
+if res_raw == None:
+  res_raw = '-6' + '\n' + 'Error parsing the supplied arguments!'
+
+response  = res_raw.split( '\n' )
+
+code = -1
+try:
+  code = int( response[0] )
+except:
+  pass
+
+ret     = code
+message = '\n'.join(response[1:])
+
+if ret != 0:
+  print 'ERROR executing the specified command (code {})'.format( ret )
+  print ''
+
+print '{}'.format( message )
+print ''
+
+quit ( ret )

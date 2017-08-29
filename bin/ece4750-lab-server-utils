@@ -1,0 +1,150 @@
+#!/usr/bin/env python
+#=========================================================================
+# ece4750-lab-server-utils [options]
+#=========================================================================
+#
+#  -h --help        Display this message
+#
+
+# Author : Khalid Al-Hawaj
+# Date   : August 26, 2017
+#
+# This is a utils server that authenticate the username through open ports
+
+import argparse
+import os
+import sys
+import threading
+import socket
+
+sys.path.append("/classes/ece4750/install/venv-pkgs/x86_64-rhel7/python2.7.12/lib/python2.7/site-packages/PyGithub-1.27.1-py2.7.egg")
+
+#-------------------------------------------------------------------------
+# Command Line Processing
+#-------------------------------------------------------------------------
+
+class ArgumentParserWithCustomError(argparse.ArgumentParser):
+  def error( self, msg = '' ):
+    if ( msg ): print('\n ERROR: %s' % msg)
+    print('')
+    file = open( sys.argv[0] )
+    for ( lineno, line ) in enumerate( file ):
+      if ( line[0] != '#' ): sys.exit(msg != '')
+      if ( (lineno == 2) or (lineno >= 4) ): print( line[1:].rstrip('\n') )
+
+def parse_cmdline():
+  p = ArgumentParserWithCustomError( add_help=False )
+
+  p.add_argument( '-h', '--help', action='store_true'         )
+
+  opts = p.parse_args()
+  if opts.help: p.error()
+  return opts
+
+opts = parse_cmdline()
+
+#-------------------------------------------------------------------------
+# Connection utilities
+#-------------------------------------------------------------------------
+
+def send_data ( sock, data, drastic = True ):
+
+  # Assume data is ASCII
+  length = len( data )
+  new_data = '{:04d}{}'.format( length, data )
+
+  # Send the packet
+  try:
+    sock.sendall( new_data )
+  except:
+    print 'ERROR: cannot send data'
+    if drastic:
+      sock.close()
+      quit ( -1 )
+    else:
+      pass
+
+def recv_data ( sock, drastic = False ):
+
+  # Again, data is text :)
+  data = None
+
+  try:
+    # Get packet length
+    tmp = sock.recv( 4 )
+    length = int( tmp )
+    data = sock.recv( length )
+  except:
+    if drastic:
+      sock.close()
+      quit ( -1 )
+    else:
+      pass
+
+  return data
+
+#-------------------------------------------------------------------------
+# Main servicing logic
+#-------------------------------------------------------------------------
+
+def service_request( client, conn_point ):
+
+  # Retrieve actual arguments
+  addr = conn_point[0]
+  port = conn_point[1]
+
+  # Read the request string
+  data = recv_data( client )
+
+  # Do we even have a request :) ?
+  if data == 'Knock! Knock!':
+
+    # Authenticate
+    send_data( client, 'Yes? This is Blink-182!' )
+
+    # Wait for a confirmation
+    data = recv_data( client )
+
+    if data:
+      req   = data.split( '\n' )
+      # Make this pretty :)
+      query = "netstat -nte 2>/dev/null | sed 's/^\\S\\+\\s\\+\\S\\+\\s\\+\\S\\+\\s\\+\\(\\S\\+:\\)\\([^: \\t]\\+\\)\\s\\+\\(\\S\\+:\\)\\([^: \\t]\\+\\)\\s\\+\\S\\+\\s\\+\\(\\S\\+\\)\\s\\+\\(\\S\\+\\)\\s\\+.*/\\1,\\2 -- \\3,\\4 -- \\5:\\6/'"
+      query += " | grep '.*:,{} -- .*:,{}'".format( req[1], req[0] )
+      query += " | sed 's/^\S\+:\S\+\s\+--\s\+\S\+:\S\+\s\+--\s\+\(\S\+\):\S\+$/\\1/'"
+      uid = os.popen(query).read()[:-1]
+      username = os.popen('id -nu {}'.format(uid)).read()[:-1]
+
+      send_data( client, username )
+
+  # Close connection
+  client.close()
+
+#-------------------------------------------------------------------------
+# Create a socket
+#-------------------------------------------------------------------------
+sock = socket.socket( socket.AF_INET, socket.SOCK_STREAM )
+sock.setsockopt( socket.SOL_SOCKET, socket.SO_REUSEADDR, 1 )
+
+address = ('', 2048)
+
+try:
+  sock.bind(address)
+  sock.listen(5)
+
+except:
+  print 'ERROR: Cannot bind/listen to assigned port'
+  quit( -1 )
+
+#-------------------------------------------------------------------------
+# Main dispatch loop
+#-------------------------------------------------------------------------
+
+while True:
+
+  try:
+    client, address = sock.accept()
+    client.settimeout(60)
+    threading.Thread(target = service_request, args = (client, address)).start()
+
+  except:
+    pass

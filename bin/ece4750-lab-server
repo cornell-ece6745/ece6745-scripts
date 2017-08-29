@@ -1,0 +1,1349 @@
+#!/usr/bin/env python
+#=========================================================================
+# ece4750-lab-server [options]
+#=========================================================================
+#
+#  -v --verbose                  Turn on verbose mode
+#  -h --help                     Display this message
+#
+
+# Author : Khalid Al-Hawaj
+# Date   : August 25, 2017
+
+import argparse
+import sys
+import os
+import datetime
+import json
+import csv
+import socket
+import threading
+
+sys.path.append("/classes/ece4750/install/venv-pkgs/x86_64-rhel7/python2.7.12/lib/python2.7/site-packages/PyGithub-1.27.1-py2.7.egg")
+
+#-------------------------------------------------------------------------
+# Constants
+#-------------------------------------------------------------------------
+
+from server_config import server_config
+
+configs = server_config()
+
+superusers = configs.getSU()
+admins     = superusers
+
+#-------------------------------------------------------------------------
+# Command Line Processing
+#-------------------------------------------------------------------------
+
+class ArgumentParserWithCustomError(argparse.ArgumentParser):
+  def error( self, msg = '' ):
+    if ( msg ): print('\n ERROR: %s' % msg)
+    print('')
+    file = open( sys.argv[0] )
+    for ( lineno, line ) in enumerate( file ):
+      if ( line[0] != '#' ): sys.exit(msg != '')
+      if ( (lineno == 2) or (lineno >= 4) ): print( line[1:].rstrip('\n') )
+
+def parse_cmdline():
+  p = ArgumentParserWithCustomError( add_help=False )
+
+  p.add_argument( '-v', '--verbose',             action='store_true'         )
+  p.add_argument( '-h', '--help',                action='store_true'         )
+
+  opts = p.parse_args()
+  if opts.help: p.error()
+  return opts
+
+opts = parse_cmdline()
+
+#-------------------------------------------------------------------------
+# Paths
+#-------------------------------------------------------------------------
+
+base_path = '/classes/ece4750/staff/'
+
+database_path      = base_path + 'database/'
+students_path      = base_path + 'students/'
+
+student_list_file = database_path + 'student-list.txt'
+
+student_info_file = database_path + 'student-info.json'
+student_csv_file  = database_path + 'student-info.csv'
+
+group_info_file   = database_path + 'group-info.json'
+group_csv_file    = database_path + 'group-info.csv'
+
+student_name = {}                                                 
+student_info = {}
+group_info   = {}
+
+import smtplib
+import binascii
+import logging
+
+# Shunning email spamming bot :)
+
+#logging.basicConfig(  filename=database_path+"ece4750-bot-mail.log",
+#                      format='%(asctime)s %(message)s',
+#                      datefmt='%m/%d/%Y %I:%M:%S %p',
+#                      level = logging.INFO
+#                      )
+#user = "ece4750.bot"
+#botpwd = None
+#
+#with open( base_path + "scripts/ece4750-bot-password","r") as f:
+#  botpwd = (f.read())[:-1]
+#
+#server = None
+#try:
+#  server = smtplib.SMTP( "smtp.gmail.com", 587 )
+#  server.ehlo()
+#  server.starttls()
+#  server.login( user, botpwd )
+#  logging.info("  Successfully login gmail" )
+#except:
+#  logging.warning( "  Failed to log in to gmail" )
+#  pass
+
+# Database/lists loading
+
+with open( student_list_file, 'r' ) as fp:
+  for line in fp.readlines():
+    strs = line.rstrip('\n').split('\t')
+
+    student_name[ strs[0] ] = strs[1]
+
+with open( student_info_file, 'r' ) as fp:
+  student_info = json.load( fp )
+
+with open( group_info_file, 'r' ) as fp:
+  group_info = json.load( fp )
+
+#-------------------------------------------------------------------------
+# Utils
+#-------------------------------------------------------------------------
+
+def find_empty_group():
+  global group_info
+  for i in xrange(1, 41):
+    if (not i in group_info.keys()) or (len(group_info[str(i)]['members']) == 0):
+      return str(i)
+  return None
+
+def write_student_info():
+  # write student-info.json
+  with open( student_info_file, 'w' ) as fp:
+    json.dump( student_info, fp, indent=4 )
+
+  # write student-info.csv
+  with open( student_csv_file, 'wb+' ) as fp:
+    csvw = csv.writer( fp )
+
+    csvw.writerow( ['netid', 'name', 'github_id', 'group', 'slipdays'] )
+
+    for stu, stu_entry in student_info.iteritems():
+      csvw.writerow([ stu,
+                      stu_entry['name'],
+                      stu_entry['github_id'],
+                      stu_entry['group'][1] if stu_entry['group'] else None,
+                      stu_entry['slipdays']
+                    ])
+
+def update_group_info():
+  global group_info
+
+  # Remove all members information
+  for gid in group_info.keys():
+    group_info[gid]['members'] = []
+
+  # Add active students back in
+  for netid in student_info.keys():
+    gid = student_info[netid]['group']
+
+    if gid:
+      if gid[0] == 'c':
+        group_id = gid[1]
+        if group_id in group_info.keys():
+          group_info[group_id]['members'].append( netid )
+        else:
+          group_info[group_id] = { 'members'      : [ netid ],
+                                   'pending_reqs' : [       ] }
+
+  # Remove empty groups
+  for gid in group_info.keys():
+    if len(group_info[gid]['members']) == 0:
+      del group_info[gid]
+
+def write_group_info():
+  # write group-info.json
+  global group_info
+  with open( group_info_file, 'w' ) as fp:
+    json.dump( group_info, fp, indent=4 )
+
+  # write group-info.csv
+  with open( group_csv_file, 'wb+' ) as fp:
+    csvw = csv.writer( fp )
+
+    csvw.writerow( ['Group Number', 'Member 1', 'Member 2', 'Member 3', 'Member 4'] )
+
+    for gid in group_info.keys():
+      csvw.writerow( [gid] + group_info[gid]['members'] )
+
+def send_email( netid, title, kind, success=True):
+  global server
+  
+  From    = "ece4750.bot@gmail.com"
+  To      = [netid+"@cornell.edu"]
+  Cc      = ["sj634@cornell.edu"]
+  subject = "[ECE 4750] %s" % title
+  
+  text = "is processed"
+  if success:
+    text = "has been successfully processed. It may take a while before the change takes an effect"
+
+  text    = '''
+Dear {},
+
+Greetings! 
+  
+You recently submitted {} request {}.
+
+Yours Truly,
+ECE4750-bot
+'''.format( student_name[netid], kind, text )
+
+  message = "From: %s\r\n" % From \
+          + "To: %s\r\n" % ",".join(To) \
+          + "CC: %s\r\n" % ",".join(Cc) \
+          + "Subject: %s\r\n" % subject \
+          + "\r\n" \
+          + text
+  
+  try:
+    server.sendmail( From, To + Cc, message )
+  except:
+    logging.warning( "  Failed to send notification to %s" % To[0] )
+
+#-------------------------------------------------------------------------
+# Connection utilities
+#-------------------------------------------------------------------------
+
+def send_data ( sock, data, drastic = True ):
+
+  # Assume data is ASCII
+  length = len( data )
+  new_data = '{:04d}{}'.format( length, data )
+
+  # Send the packet
+  try:
+    sock.sendall( new_data )
+  except:
+    print 'ERROR: cannot send data'
+    if drastic:
+      sock.close()
+      quit ( -1 )
+    else:
+      pass
+
+def recv_data ( sock, drastic = False ):
+
+  # Again, data is text :)
+  data = None
+
+  try:
+    # Get packet length
+    tmp = sock.recv( 4 )
+    length = int( tmp )
+    data = sock.recv( length )
+  except:
+    if drastic:
+      sock.close()
+      quit ( -1 )
+    else:
+      pass
+
+  return data
+
+#-------------------------------------------------------------------------
+# Locks, counters, and status variables
+#-------------------------------------------------------------------------
+
+num_updaters = 0
+
+group_lock   = threading.Lock()
+counter_lock = threading.Lock()
+
+db_dirty        = False
+server_shutdown = False
+stall_requests  = False
+reset_db        = False
+update_db       = False
+server_started  = False
+
+# GitHub stuff
+
+from github import Github
+from github import GithubException
+
+github_obj   = None
+course_org   = None
+generic_team = None
+groups_teams = None
+
+#-------------------------------------------------------------------------
+# Locking mechanism
+#-------------------------------------------------------------------------
+
+def admit_updater():
+
+  # Global stuff
+  global counter_lock
+  global num_updaters
+
+  # Acquire the lock
+  counter_lock.acquire()
+
+  # Increase number of updaters
+  num_updaters += 1
+
+  # Release the lock
+  counter_lock.release()
+
+def release_updater():
+
+  # Global stuff
+  global counter_lock
+  global num_updaters
+
+  # Acquire the lock
+  counter_lock.acquire()
+
+  # Increase number of updaters
+  num_updaters -= 1
+
+  # Release the lock
+  counter_lock.release()
+
+def wait_for_updaters( expected = 0 ):
+
+  # Global stuff
+  global num_updaters
+
+  while (num_updaters != expected) :
+    pass
+
+#-------------------------------------------------------------------------
+# Service utilities
+#-------------------------------------------------------------------------
+
+def retrieve_netid( addr, port ):
+
+  # To be ...
+  netid = None
+
+  # Connect to a service in the same server it is coming from
+  sock = None
+
+  try:
+    sock = socket.create_connection(( addr, configs.utils_port ))
+  except:
+    return None
+
+  if sock:
+
+    # Authenticate
+    send_data( sock, 'Knock! Knock!' )
+    data = recv_data( sock )
+
+    if data and data == 'Yes? This is Blink-182!':
+
+      # Send the request
+      send_data( sock, '{}\n{}'.format( port, configs.server_port ) )
+      data = recv_data( sock )
+
+      if data:
+        netid = data
+
+  # Finished
+  return netid
+
+#-------------------------------------------------------------------------
+# Thread for writing the database
+#-------------------------------------------------------------------------
+
+def sync_database ():
+
+  # Globals
+  global student_info
+  global group_info
+  global db_dirty
+  global stall_requests
+  global student_name
+  global update_db
+  global reset_db
+
+  # Infinit loop
+  while not server_shutdown:
+
+    # Check if db_dirty
+    if db_dirty:
+
+      # Stop incoming requests
+      stall_requests = True
+
+      # Wait for requests in-flight
+      wait_for_updaters()
+
+      # Check pending requests
+      if   reset_db:
+        student_info = {}
+        group_info   = {}
+      elif update_db:
+        for netid in sorted( student_name.keys() ):
+          if not (netid in student_info.keys()):
+            student_info[netid] = {
+                                    'name'     : student_name[netid],
+                                    'group'    : None               ,
+                                    'github_id': None               ,
+                                    'slipdays' : 3                  ,
+                                  }
+
+      # No matter what the outcome is, we've taken care of it :)
+      reset_db  = False
+      update_db = False
+
+      # Update group database
+      update_group_info()
+
+      # Update the database on the disk
+      write_student_info()
+      write_group_info()
+
+      # Reset dirty bit
+      db_dirty = False
+
+      # Resume incoming requests
+      stall_requests = False
+
+#-------------------------------------------------------------------------
+# Helper functions
+#-------------------------------------------------------------------------
+
+#=========================================
+# Update a group's description
+#=========================================
+def update_group_description ( group_id ):
+
+  # Globals
+  global group_lock
+  global student_info
+  global group_info
+  global db_dirty
+
+  global github_obj
+  global course_org
+  global generic_team
+  global groups_teams
+
+  # Get GitHub team
+  group_name = 'lab-group{:02d}'.format( int( group_id ) )
+
+  repo = course_org.get_repo( group_name )
+
+  # Generate description
+  group_members = []
+  if group_id in group_info.keys():
+    group_members = group_info[group_id]['members']
+
+  names = []
+  for netid in group_members:
+    names.append( student_info[netid]['name'] + ' (' + netid + ')' )
+
+  description = ', '.join( names )
+
+  repo.edit( group_name, description = description )
+
+#=========================================
+# Assigning a GitHub to a user
+#=========================================
+def assign_github_id ( netid, github_id ):
+
+  # Globals
+  global student_info
+  global db_dirty
+
+  global github_obj
+  global course_org
+  global generic_team
+  global groups_teams
+
+  # Return
+  ret = -1
+  msg = ''
+
+  # If the user is already part of a group
+  if student_info[netid]['group'] != None:
+    if   student_info[netid]['group'][0] == 'c':
+      ret = -100
+      msg =   'You are already part of a group.' + \
+            '\nLeave the group to be able to change your GitHub ID.'
+
+      return ( ret, msg )
+
+    elif student_info[netid]['group'][0] == 'p':
+      ret = -101
+      msg =   'You are already have a pending join request for a group.' + \
+            '\nDelete the join request to change your GitHub ID.'
+
+      return ( ret, msg )
+
+    else:
+      ret = -102
+      msg =   'Your group record is corrupted.' + \
+            '\nPlease, contact the course\'s staff to fix this.'
+
+      return ( ret, msg )
+
+  # Old github
+  o_github_id = student_info[netid]['github_id']
+
+  # This function does NOT catch not included students
+  if github_id != '' and (github_id != o_github_id):
+    # Old github
+    o_github_id = student_info[netid]['github_id']
+
+    # Try to add it to github
+    try:
+      # Try to add the user to the generic team
+      github_user = github_obj.get_user( github_id )
+      generic_team.add_membership( github_user )
+      try:
+        generic_team.add_to_members( github_user )
+      except:
+        pass
+
+      ret = 0
+      msg = 'GitHub ID was successfully updated'
+      student_info[netid]['github_id'] = github_id
+
+      if o_github_id != None and o_github_id != 'hawajkm':
+        # Worked! Now, remove old github ID. We don't care if this fails
+        github_user = github_obj.get_user( o_github_id )
+        try:
+          generic_team.remove_from_members( github_user )
+        except:
+          pass
+
+        try:
+          course_org.remove_from_members( github_user )
+        except:
+          pass
+
+        try:
+          course_org.remove_from_public_members( github_user )
+        except:
+          pass
+
+      # Database is dirty
+      db_dirty = True
+
+    except:
+      ret = 16
+      msg =  'Failed to add GitHub ID.' + \
+            ' Check whether the ID "{}" is valid.'.format( github_id )
+
+  elif github_id == o_github_id:
+    ret = 2
+    msg = 'No change to the GitHub ID. This request will be ignored!'
+
+  else:
+    ret = 2
+    msg = 'Invalid GitHub ID "{}"'.format( github_id )
+
+  # Return
+  return ( ret, msg )
+
+#=========================================
+# Create a group
+#=========================================
+def create_group ( netid ):
+
+  # Globals
+  global group_lock
+  global student_info
+  global group_info
+  global db_dirty
+
+  global github_obj
+  global course_org
+  global generic_team
+  global groups_teams
+
+  # Return message and code
+  ret = -1
+  msg = ''
+
+  # Does the student have a group already?
+  # If so, deny creating a new group
+  if student_info[netid]['group']:
+    if   student_info[netid]['group'][0] == 'c':
+      ret = -15
+      msg =  'You are already part of group {}.'.format( student_info[netid]['group'][1] ) + \
+            ' Plese, leave any group before attempting creating a new group.'
+
+    elif student_info[netid]['group'][0] == 'p':
+      ret = -15
+      msg =  'You have a join request for group {}.'.format( student_info[netid]['group'][1] ) + \
+            ' Plese, cancel your join request before attempting creating a new group.'
+
+    else:
+      ret = -15
+      msg =  'Your group record is corrupted.' + \
+            ' Please, contact the course\'s staff to fix this.'
+
+  else:
+    # Acquire a lock
+    group_lock.acquire()
+
+    # Find an empty group
+    group_id = find_empty_group()
+
+    if group_id == None:
+      ret = -16
+      msg =  'No groups are available now.' + \
+            ' Try again later or contact the course\'s staff.'
+
+    else:
+      github_user = student_info[netid]['github_id']
+      github_id = github_obj.get_user( github_user )
+
+      if course_org.has_in_members( github_id ):
+        team_name = 'lab-group{:02d}'.format( int( group_id ) )
+        team = groups_teams[team_name]
+
+        team.add_to_members( github_id )
+
+        student_info[netid]['group'] = ['c', group_id]
+
+        ret = 0
+        msg = 'Group "{}" was successfully created.'.format( group_id )
+
+        # Update Groups
+        group_info[group_id] = { 'members'      : [ netid ],
+                                 'pending_reqs' : [       ] }
+
+        # Update github description
+        update_group_description( group_id )
+
+        # Database needs update
+        db_dirty = True
+
+      else:
+        # Properly didn't accept invitation
+        ret = -19
+        msg =  'It seems that you did not accept the invitation for GitHub ID' + \
+              ' "{}".\nPlease, accept the invitation and try again later.'.format( github_user )
+
+    # Release lock
+    group_lock.release()
+
+  # Return
+  return ( ret, msg )
+
+#=========================================
+# Leave a group
+#=========================================
+def leave_group ( netid ):
+
+  # Globals
+  global group_lock
+  global student_info
+  global group_info
+  global db_dirty
+
+  global github_obj
+  global course_org
+  global generic_team
+  global groups_teams
+
+  # Return message and code
+  ret = -1
+  msg = ''
+
+  # Make sure the student have a group
+  if student_info[netid]['group']:
+    # Acquire a lock
+    group_lock.acquire()
+
+    # Get current group
+    group_status = student_info[netid]['group']
+
+    if group_status[0] == 'c':
+      group_id = group_status[1]
+
+      team_name = 'lab-group{:02d}'.format( int( group_id ) )
+      team = groups_teams[team_name]
+
+      github_id = github_obj.get_user( student_info[netid]['github_id'] )
+      team.remove_from_members( github_id )
+
+      # Update Group
+      while netid in group_info[group_id]['members']:
+        group_info[group_id]['members'].remove( netid )
+
+      # All is well ...
+      ret = 0
+      msg = 'You were removed from group "{}" successfully.'.format( group_id )
+
+      # Update github description
+      update_group_description( group_id )
+
+    elif group_status[0] == 'p':
+      group_id = group_status[1]
+
+      # Update Group
+      while netid in group_info[group_id]['pending_reqs']:
+        group_info[group_id]['pending_reqs'].remove( netid )
+
+      # All is well ...
+      ret = 0
+      msg = 'Your joining request was removed from group "{}" successfully.'.format( group_id )
+
+    else:
+      # All is well ...
+      ret = 0
+      msg = 'Your corrupted group record was reset successfully.'
+
+    # Reset the student's group status
+    student_info[netid]['group'] = None
+
+    if len(group_info[group_id]['members']) == 0:
+      # Remove group from pending requests
+      for pending_netid in group_info[group_id]['pending_reqs']:
+        student_info[pending_netid]['group'] = None
+
+      # Remove the group
+      del group_info[group_id]
+
+    # Database needs update
+    db_dirty = True
+
+    # Release lock
+    group_lock.release()
+
+  else:
+    ret = -18
+    msg =  'You are not currently part of any group' + \
+          ' nor do you have a pending joining request' + \
+          ' This request will be ignored!'
+
+  # Return
+  return ( ret, msg )
+
+#=========================================
+# Join a group
+#=========================================
+def join_group ( netid, group_id ):
+
+  # Globals
+  global group_lock
+  global student_info
+  global group_info
+  global db_dirty
+
+  global github_obj
+  global course_org
+  global generic_team
+  global groups_teams
+
+  # Return message and code
+  ret = -1
+  msg = ''
+
+  # Fail safe
+  group_id = str( group_id )
+
+  # Does the student have a group already?
+  # If so, deny joining another group
+  if student_info[netid]['group']:
+    if   student_info[netid]['group'][0] == 'c':
+      ret = -15
+      msg =  'You are already part of group {}.'.format( student_info[netid]['group'][1] ) + \
+            ' Plese, leave your group before attempting joining another group.'
+
+    elif student_info[netid]['group'][0] == 'p':
+      ret = -15
+      msg =  'You have a join request for group {}.'.format( student_info[netid]['group'][1] ) + \
+            ' Plese, cancel your join request before attempting joining another group.'
+
+    else:
+      ret = -15
+      msg =  'Your group record is corrupted.' + \
+            ' Please, contact the course\'s staff to fix this.'
+  else:
+    # Check if the group exists
+    if group_id in group_info.keys():
+      # Check if group is still alive
+      if len(group_info[group_id]['members']) > 0:
+        # Acquire a lock
+        group_lock.acquire()
+
+        # All we do is place a pending joining request
+        group_info[group_id]['pending_reqs'].append( netid )
+
+        # Keep track ...
+        student_info[netid]['group'] = ['p', group_id]
+
+        # All is well ...
+        ret = 0
+        msg = 'Your request to join group "{}" is pending approval.'.format( group_id )
+
+        # Dirty DB
+        db_dirty = True
+
+        # Done
+        group_lock.release()
+
+      else:
+        ret = -215
+        msg = 'Group does not exist'
+
+    else:
+      ret = -215
+      msg = 'Group does not exist'
+
+  # Return
+  return ( ret, msg )
+
+#=========================================
+# Return pending join-requests
+#=========================================
+def pending_group ( netid ):
+
+  # Globals
+  global group_lock
+  global student_info
+  global group_info
+  global db_dirty
+
+  global github_obj
+  global course_org
+  global generic_team
+  global groups_teams
+
+  # Return message and code
+  ret = -1
+  msg = ''
+
+  # Make sure the student have a group
+  if student_info[netid]['group']:
+    # Acquire a lock
+    group_lock.acquire()
+
+    # Get current group
+    group_status = student_info[netid]['group']
+
+    if group_status[0] == 'c':
+      group_id = group_status[1]
+
+      # All is well ...
+      ret = 0
+      msg = 'Pending join-requests for group {}: {}'\
+            .format( group_id, ', '.join(group_info[group_id]['pending_reqs']) )
+
+    elif group_status[0] == 'p':
+      group_id = group_status[1]
+
+      # All is well ...
+      ret = -218
+      msg =   'Your joining request to group "{}" is still pending.'.format( group_id ) + \
+            '\nYou cannot view group\'s administrative tasks until you are approved.'
+
+    else:
+      # All is well ...
+      ret = -219
+      msg = 'Your group record is corrupted.'
+
+    # Release lock
+    group_lock.release()
+
+  else:
+    ret = -18
+    msg =  'You are not currently part of any group' + \
+          ' nor do you have a pending joining request' + \
+          ' This request will be ignored!'
+
+  # Return
+  return ( ret, msg )
+
+#=========================================
+# Approve pending join-requests
+#=========================================
+def approve_group ( netid, o_netid ):
+
+  # Globals
+  global group_lock
+  global student_info
+  global group_info
+  global db_dirty
+
+  global github_obj
+  global course_org
+  global generic_team
+  global groups_teams
+
+  # Return message and code
+  ret = -1
+  msg = ''
+
+  # Make sure the student have a group
+  if student_info[netid]['group']:
+    # Acquire a lock
+    group_lock.acquire()
+
+    # Get current group
+    group_status = student_info[netid]['group']
+
+    if group_status[0] == 'c':
+      group_id = group_status[1]
+
+      # Make sure that the o_netid has a pending request
+      if o_netid in group_info[group_id]['pending_reqs']:
+
+        # Make sure o_netid has correct records
+        o_group_status = None
+        if o_netid in student_info:
+          o_group_status = student_info[o_netid]['group']
+
+        if o_group_status and o_group_status[0] == 'p' and o_group_status[1] == group_id:
+
+          # Make sure github ID set properly
+          if student_info[o_netid]['github_id']:
+            o_github_user = student_info[o_netid]['github_id']
+            o_github_id   = github_obj.get_user( o_github_user )
+
+            # Make sure o_netid has accepted invitation to the orginization
+            if course_org.has_in_members( o_github_id ):
+
+              group_name = 'lab-group{:02d}'.format( int( group_id ) )
+
+              # Add user
+              try:
+                groups_teams[group_name].add_to_members( o_github_id )
+
+                student_info[o_netid]['group'][0] = 'c'
+                group_info[group_id]['members'].append( o_netid )
+
+                while o_netid in group_info[group_id]['pending_reqs']:
+                  group_info[group_id]['pending_reqs'].remove( o_netid )
+
+                # Update github description
+                update_group_description( group_id )
+
+                # All is well ...
+                ret = 0
+                msg = 'Joining request for NetID {} has been accepted successfully'\
+                      .format( o_netid )
+
+              except:
+                # All is well ...
+                ret = -318
+                msg = 'Adding NetID {}\'s GitHub ID {} to group {} failed.'\
+                      .format( o_netid, o_github_user, group_id )
+
+            else:
+              ret = -316
+              msg = 'NetID {} has not accepted invitation to course orginization.'.format( o_netid )
+
+          else:
+            ret = -313
+            msg = 'Inconsistant database.'
+
+        else:
+          ret = -313
+          msg = 'Inconsistant database.'
+
+      else:
+        ret = -310
+        msg = 'NetID {} has not pending join request to group {}.'.format( o_netid, group_id )
+
+    elif group_status[0] == 'p':
+      group_id = group_status[1]
+
+      # All is well ...
+      ret = -218
+      msg =   'Your joining request to group "{}" is still pending.'.format( group_id ) + \
+            '\nYou cannot execute group\'s administrative tasks until you are approved.'
+
+    else:
+      # All is well ...
+      ret = -219
+      msg = 'Your group record is corrupted.'
+
+    # Release lock
+    group_lock.release()
+
+  else:
+    ret = -18
+    msg =  'You are not currently part of any group' + \
+          ' nor do you have a pending joining request' + \
+          ' This request will be ignored!'
+
+  # Return
+  return ( ret, msg )
+
+#=========================================
+# Setup the server
+#=========================================
+def server_setup ( username, pwd ):
+
+  # Globals
+  global reset_db
+  global db_dirty
+  global server_started
+
+  global github_obj
+  global course_org
+  global generic_team
+  global groups_teams
+
+  # Return
+  ret = -1
+  msg = ''
+
+  try:
+    tmp_github_obj = Github( username, pwd, user_agent='PyGithub' )
+    tmp_course_org = tmp_github_obj.get_organization( 'cornell-ece4750' )
+    tmp_teams      = tmp_course_org.get_teams()
+    tmp_course_org.get_members()
+
+    # WORKED
+    ret = 0
+    msg = 'Server was successfully started and properly setup.'
+
+    # Swap
+    github_obj = tmp_github_obj
+    course_org = tmp_course_org
+
+    # Parse teams :)
+    groups_teams = {}
+    for team in tmp_teams:
+      if   team.name      == 'students':
+        generic_team = team
+      elif team.name[0:9] == 'lab-group':
+        groups_teams[team.name] = team
+
+    # :)
+    server_started = True
+
+  except GithubException as e:
+    ret = -64
+    msg =  'GitHub could NOT connect properly.' + \
+         '\nCheck the provided username/password as well as premissions.'
+
+  # Finish
+  return ( ret, msg )
+
+#=========================================
+# Resetting the database
+#=========================================
+def reset_database ():
+
+  # Globals
+  global reset_db
+  global db_dirty
+
+  # Return
+  ret = -1
+  msg = ''
+
+  # Signal intentions
+  reset_db = True
+
+  # Report
+  ret = 0
+  msg =   'Database reset was scheduled successfully' + \
+        '\nThe request will be executed during the next database sync'
+
+  # Database is super dirty
+  db_dirty = True
+
+  # Finish
+  return ( ret, msg )
+
+#=========================================
+# Update the database
+#=========================================
+def update_database ():
+
+  # Globals
+  global update_db
+  global db_dirty
+
+  # Return
+  ret = -1
+  msg = ''
+
+  # Add a pending request for update
+  update_db = True
+
+  # Report
+  ret = 0
+  msg =   'Database update was scheduled successfully' + \
+        '\nThe request will be executed during the next database sync'
+
+
+  # Database is super dirty
+  db_dirty = True
+
+  # Finish
+  return ( ret, msg )
+
+#-------------------------------------------------------------------------
+# Execute commands routine
+#-------------------------------------------------------------------------
+
+def execute_command( netid, cmd, args ):
+
+  # Globals
+  global student_info
+  global superusers
+  global server_started
+
+  # Check if we have a valid netid
+  ret = -1
+  msg = ''
+  if netid == None or netid == '':
+    ret = 1
+    msg = 'Invalid NetID'
+    return ( ret, msg )
+
+  # Gather basic information about the netid
+  netid_exists = ( netid in student_info )
+  netid_su     = ( netid in superusers   )
+  group        = None
+  github_id    = None
+  if netid_exists:
+    github_id = student_info[netid]['github_id']
+    group     = student_info[netid]['group' ]
+
+  # Execute the command
+  serviced = False
+
+  # Admin specific commands
+  if cmd == 'server':
+    serviced = True
+    if netid_su:
+      # Reset the database
+      if   args[0] == 'reset':
+        ret, msg = reset_database()
+
+      # Update the database
+      elif args[0] == 'update':
+        ret, msg = update_database()
+
+      # Setup the server
+      elif args[0] == 'setup':
+        if len(args[1:]) >= 2:
+          ret, msg = server_setup( args[1], args[2] )
+        else:
+          ret = -7
+          msg = 'Not enough arguments supplied for "server setup"'
+
+      # Not defined
+      else:
+        ret = 2
+        msg = 'Operation "{}" is not defined as a server command.'.format( args[0] )
+
+    else:
+      # NetID is not in the database
+      ret = -5
+      msg = 'Your are not authorized to perform the requested operation'
+
+  # If not an admin command,
+  # don't do anything if server wasn't started properly
+  if not serviced and not server_started:
+    ret = -128
+    msg =   'Server was NOT started properly.' + \
+          '\nTry again later or contact the course\'s staff'
+    return ( ret, msg )
+
+  # STATUS ENQUIRY
+  if cmd == 'status':
+    serviced = True
+    if netid_exists:
+      ret = 0
+      msg = 'Your NetID is {}'.format(netid)
+      if github_id:
+        msg += '\nYour GitHub ID is set to "{}"'.format(github_id)
+      else:
+        msg += '\nYour GitHub ID has NOT been set.'
+      if group:
+        if   group[0] == 'c':
+          msg += '\nYou are assigned to group {}'.format(group[1])
+        elif group[0] == 'p':
+          msg += '\nYou have a pending joining request to group {}'.format(group[1])
+        else:
+          msg += '\nYou have a corrupted group record.'
+      else:
+        msg += '\nYou are NOT assigned to any group.'
+    else:
+      # NetID is not in the database
+      ret = 1
+      msg = 'Your NetID {} is not in our database.'.format( netid ) + \
+            '\nMake sure you are properly enrolled in the class.' + \
+            '\nEmail the course\'s staff to fix this issue.'
+
+  # GitHub stuff
+  if cmd == 'github':
+    serviced = True
+    if netid_exists:
+      if args[0] == 'set':
+        ret, msg = assign_github_id( netid, args[1] )
+      else:
+        ret = 2
+        msg = 'Operation "{}" is not defined as a GitHub command.'.format( args[0] )
+    else:
+      # NetID is not in the database
+      ret = 1
+      msg = 'Your NetID {} is not in our database.'.format( netid ) + \
+            '\nMake sure you are properly enrolled in the class.' + \
+            '\nEmail the course\'s staff to fix this issue.'
+
+  # Group Managment
+  if cmd == 'group':
+    serviced = True
+    if netid_exists and github_id:
+      if   args[0] == 'create':
+        ret, msg = create_group( netid )
+      elif args[0] == 'leave':
+        ret, msg = leave_group( netid )
+      elif args[0] == 'join':
+        if len( args ) < 2:
+          ret = -2
+          msg = 'Group ID is missing! Incomplete command.'
+        else:
+          if len(args[1]) > 0:
+            group_id = args[1]
+            ret, msg = join_group( netid, group_id )
+          else:
+            ret = -3
+            msg = 'Invalid group ID was provided. Make sure that group ID is an integer.'
+      elif args[0] == 'pending':
+        ret, msg = pending_group( netid )
+      elif args[0] == 'approve':
+        ret, msg = approve_group( netid, args[1] )
+      else:
+        ret = 2
+        msg = 'Operation "{}" is not defined as a GitHub command.'.format( args[0] )
+    elif netid_exists:
+      # NetID is not in the database
+      ret = 10
+      msg = 'You have not set a GitHub ID.' + \
+            '\nSet a proper GitHub ID and accept the invitation to ECE4750 orginization.'
+    else:
+      # NetID is not in the database
+      ret = 1
+      msg = 'Your NetID {} is not in our database.'.format( netid ) + \
+            '\nMake sure you are properly enrolled in the class.' + \
+            '\nEmail the course\'s staff to fix this issue.'
+
+  # What if command is not defined?
+  if not serviced:
+    ret = -1
+    msg = 'Command "{}" is not defined.'.format( cmd )
+
+  return ( ret, msg )
+
+#-------------------------------------------------------------------------
+# Main servicing logic
+#-------------------------------------------------------------------------
+
+def service_request( client, conn_point ):
+
+  # Retrieve actual arguments
+  addr = conn_point[0]
+  port = conn_point[1]
+
+  # Get the netid
+  netid = retrieve_netid( addr, port )
+
+  # Read the request string
+  req_raw = recv_data( client )
+
+  # We return a message and an exit code to the requester
+  ret = -1
+  msg = ''
+
+  # Do we even have a request :) ?
+  if req_raw and netid:
+
+    # Count us in as updaters
+    admit_updater()
+
+    # Service the request
+    # request will be in the format of "REQUEST\nARGUMENT_1\n ..."
+    req  = req_raw.split('\n')
+
+    # Switch on the request
+    cmd  = req[0 ]
+    args = req[1:]
+    ret, msg = execute_command( netid, cmd, args )
+
+    # We are done! :)
+    release_updater()
+
+  else:
+
+    # Invalid request
+    ret = -1
+    msg = 'Invalid request.'
+
+  # Return response
+  response = '{}\n{}'.format( ret, msg )
+  send_data( client, response, False )
+
+  # Cleanly close connection
+  client.close()
+
+#-------------------------------------------------------------------------
+# Dispatching logic
+#-------------------------------------------------------------------------
+# hawajkm: Instead of reading files, we actually have a proper inter-
+#          process communication through TCP/IP
+
+# Thread for updating the DB on the disk
+threading.Thread(target = sync_database).start()
+
+sock = socket.socket( socket.AF_INET, socket.SOCK_STREAM )
+sock.setsockopt( socket.SOL_SOCKET, socket.SO_REUSEADDR, 1 )
+
+address = ( '', configs.server_port )
+
+try:
+
+  sock.bind(address)
+  sock.listen(5)
+
+except:
+
+  print 'ERROR: Cannot bind/listen to assigned port'
+  quit( -1 )
+
+while True:
+
+  try:
+    # Accept incoming connections
+    client, address = sock.accept()
+
+    # Wait for any stalling requests
+    while stall_requests :
+      pass
+
+    # Dispatch
+    client.settimeout(60)
+    threading.Thread(target = service_request, args = (client, address)).start()
+
+  except:
+    pass
