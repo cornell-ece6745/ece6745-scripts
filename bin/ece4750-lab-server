@@ -141,7 +141,7 @@ else:
 def find_empty_group():
   global group_info
   for i in xrange(1, 41):
-    if (not i in group_info.keys()) or (len(group_info[str(i)]['members']) == 0):
+    if (not str(i) in group_info.keys()) or (len(group_info[str(i)]['members']) == 0):
       return str(i)
   return None
 
@@ -1360,6 +1360,12 @@ def service_request( client, conn_point ):
 
     # We are done! :)
     release_updater()
+
+  elif not netid:
+
+    # Couldn't authenticate the username
+    ret = -1
+    msg = 'Could not authenticate the NetID of the requester.'
 
   else:
 
