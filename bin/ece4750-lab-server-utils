@@ -109,7 +109,7 @@ def service_request( client, conn_point ):
       req   = data.split( '\n' )
       # Make this pretty :)
       query = "netstat -nte 2>/dev/null | sed 's/^\\S\\+\\s\\+\\S\\+\\s\\+\\S\\+\\s\\+\\(\\S\\+:\\)\\([^: \\t]\\+\\)\\s\\+\\(\\S\\+:\\)\\([^: \\t]\\+\\)\\s\\+\\S\\+\\s\\+\\(\\S\\+\\)\\s\\+\\(\\S\\+\\)\\s\\+.*/\\1,\\2 -- \\3,\\4 -- \\5:\\6/'"
-      query += " | grep '.*:,{} -- .*:,{}'".format( req[1], req[0] )
+      query += " | grep '.*:,{} -- .*:,{}'".format( req[0], req[1] )
       query += " | sed 's/^\S\+:\S\+\s\+--\s\+\S\+:\S\+\s\+--\s\+\(\S\+\):\S\+$/\\1/'"
       uid = os.popen(query).read()[:-1]
       username = os.popen('id -nu {}'.format(uid)).read()[:-1]
