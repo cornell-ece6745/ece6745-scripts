@@ -454,6 +454,7 @@ def sync_database ():
 
   # Globals
   global server_started
+  global server_shutdown
   global student_info
   global group_info
   global db_dirty
@@ -467,7 +468,7 @@ def sync_database ():
   while True:
 
     # Check if db_dirty
-    if db_dirty:
+    if db_dirty or server_shutdown:
 
       # Hmmm ...
       log = ''
@@ -509,6 +510,10 @@ def sync_database ():
 
       # Resume incoming requests
       stall_requests = False
+
+      # If we are doing a shutdown
+      if server_shutdown:
+        return
 
 #-------------------------------------------------------------------------
 # Helper functions
@@ -1244,6 +1249,7 @@ def execute_command( netid, cmd, args ):
   global student_info
   global superusers
   global server_started
+  global server_shutdown
 
   # Check if we have a valid netid
   ret = -1
@@ -1287,6 +1293,15 @@ def execute_command( netid, cmd, args ):
         else:
           ret = -7
           msg = 'Not enough arguments supplied for "server setup"'
+
+      # Setup the server
+      elif args[0] == 'quit':
+        # Signal a shutdown
+        server_shutdown = True
+
+        ret = 0
+        msg =   'Shutting down the server.' + \
+              '\nPending requests followed by a database sync will be execuetd'
 
       # Initialize group repos
       elif args[0] == 'init_repos':
@@ -1482,7 +1497,10 @@ except:
   print 'ERROR: Cannot bind/listen to assigned port'
   quit( -1 )
 
-while True:
+# Time-out
+sock.settimeout(0.2)
+
+while not server_shutdown:
 
   try:
     # Accept incoming connections
