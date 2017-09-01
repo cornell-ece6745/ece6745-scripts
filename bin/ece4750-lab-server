@@ -110,16 +110,6 @@ import logging
 
 init_db_dirty = False
 
-student_name = {}
-if os.path.exists( student_list_file ):
-  with open( student_list_file, 'r' ) as fp:
-    for line in fp.readlines():
-      strs = line.rstrip('\n').split('\t')
-  
-      student_name[ strs[0] ] = strs[1]
-else:
-  init_db_dirty = init_db_dirty | True
-
 student_info = {}
 if os.path.exists( student_info_file ):
   with open( student_info_file, 'r' ) as fp:
@@ -293,6 +283,7 @@ server_shutdown = False
 stall_requests  = False
 reset_db        = False
 update_db       = False
+force_update    = False
 server_started  = False
 
 # GitHub stuff
@@ -351,6 +342,9 @@ def wait_for_updaters( expected = 0 ):
 # Service utilities
 #-------------------------------------------------------------------------
 
+#=========================================
+# Authenticate NetID's
+#=========================================
 def retrieve_netid( addr, port ):
 
   # To be ...
@@ -382,6 +376,76 @@ def retrieve_netid( addr, port ):
   # Finished
   return netid
 
+#=========================================
+# Refresh the Database from students' list
+#=========================================
+def refresh_database ( force = False ):
+
+  # Globals
+  global student_info
+
+  # Log!
+  log = ''
+
+  if os.path.exists( student_list_file ):
+
+    # Dictionary for students
+    students = {}
+
+    # Load all students
+    with open( student_list_file, 'r' ) as fp:
+      for line in fp.readlines():
+        strs = line.rstrip('\n').split('\t')
+    
+        students[ strs[0] ] = strs[1]
+
+    # Add new students
+    for netid in sorted( students.keys() ):
+      if not (netid in student_info.keys()):
+
+        if log != '':
+          log += '\n'
+        log += 'Adding {} ({})'.format( students[netid], netid )
+
+        student_info[netid] = {
+                                'name'     : students[netid],
+                                'group'    : None           ,
+                                'github_id': None           ,
+                                'slipdays' : 3              ,
+                              }
+
+    # Experimental ... :)
+    # Delete departing students ...
+    for netid in student_info.keys():
+
+      if not netid in students.keys():
+        # Students dropped the course
+        name = student_info[netid]['name']
+        github_user = student_info[netid]['github_id']
+
+        if force:
+          if github_user:
+            # Remove from the group
+            leave_group( netid )
+
+            # Remove from organization
+            try:
+              course_org.remover_from_members( github_id )
+            except:
+              pass
+
+          # Delete student's record
+          del student_info[netid]
+
+        if not github_user:
+          github_user = ''
+        if log != '':
+          log += '\n'
+        log += 'Removing {} ({}) ({})'.format( name, netid, github_user )
+
+  # :)
+  return log
+
 #-------------------------------------------------------------------------
 # Thread for writing the database
 #-------------------------------------------------------------------------
@@ -389,19 +453,24 @@ def retrieve_netid( addr, port ):
 def sync_database ():
 
   # Globals
+  global server_started
   global student_info
   global group_info
   global db_dirty
   global stall_requests
   global student_name
   global update_db
+  global force_update
   global reset_db
 
   # Infinit loop
-  while not server_shutdown:
+  while True:
 
     # Check if db_dirty
     if db_dirty:
+
+      # Hmmm ...
+      log = ''
 
       # Stop incoming requests
       stall_requests = True
@@ -413,19 +482,16 @@ def sync_database ():
       if   reset_db:
         student_info = {}
         group_info   = {}
-      elif update_db:
-        for netid in sorted( student_name.keys() ):
-          if not (netid in student_info.keys()):
-            student_info[netid] = {
-                                    'name'     : student_name[netid],
-                                    'group'    : None               ,
-                                    'github_id': None               ,
-                                    'slipdays' : 3                  ,
-                                  }
 
-      # No matter what the outcome is, we've taken care of it :)
-      reset_db  = False
-      update_db = False
+        reset_db  = False
+        update_db = False
+
+      elif update_db:
+        # This is far too complex to fit here
+        if server_started:
+          log = refresh_database ( force_update )
+          update_db = False
+          force_update = False
 
       # Update group database
       update_group_info()
@@ -433,6 +499,10 @@ def sync_database ():
       # Update the database on the disk
       write_student_info()
       write_group_info()
+
+      # Print log
+      if log != '':
+        print '{}'.format( log )
 
       # Reset dirty bit
       db_dirty = False
@@ -1095,6 +1165,9 @@ def server_setup ( username, pwd ):
 
     # :)
     server_started = True
+    if update_db:
+      # If an update is pending
+      db_dirty = True
 
   except GithubException as e:
     ret = -64
@@ -1134,10 +1207,11 @@ def reset_database ():
 #=========================================
 # Update the database
 #=========================================
-def update_database ():
+def update_database ( force = False ):
 
   # Globals
   global update_db
+  global force_update
   global db_dirty
 
   # Return
@@ -1146,6 +1220,7 @@ def update_database ():
 
   # Add a pending request for update
   update_db = True
+  force_update = force
 
   # Report
   ret = 0
@@ -1200,7 +1275,10 @@ def execute_command( netid, cmd, args ):
 
       # Update the database
       elif args[0] == 'update':
-        ret, msg = update_database()
+        force = False
+        if len(args) > 1:
+          force = args[1] == 'force'
+        ret, msg = update_database( force )
 
       # Setup the server
       elif args[0] == 'setup':
