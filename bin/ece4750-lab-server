@@ -358,7 +358,7 @@ def retrieve_netid( addr, port ):
   sock = None
 
   try:
-    sock = socket.create_connection(( addr, configs.utils_port ))
+    sock = socket.create_connection(( addr, sConfigs.utils_port ))
   except:
     return None
 
@@ -371,7 +371,7 @@ def retrieve_netid( addr, port ):
     if data and data == 'Yes? This is Blink-182!':
 
       # Send the request
-      send_data( sock, '{}\n{}'.format( port, configs.server_port ) )
+      send_data( sock, '{}\n{}'.format( port, gConfigs.server_port ) )
       data = recv_data( sock )
 
       if data:
@@ -1526,7 +1526,7 @@ threading.Thread(target = sync_database).start()
 sock = socket.socket( socket.AF_INET, socket.SOCK_STREAM )
 sock.setsockopt( socket.SOL_SOCKET, socket.SO_REUSEADDR, 1 )
 
-address = ( '', configs.server_port )
+address = ( '', gConfigs.server_port )
 
 try:
 
