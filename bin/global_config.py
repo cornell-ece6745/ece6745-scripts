@@ -1,18 +1,14 @@
 #=========================================================================
-# server_config
+# global_config
 #=========================================================================
 #
 # Author : Khalid Al-Hawaj
 # Date   : August 26, 2017
 
-class server_config():
+class global_config():
 
   def __init__( self ):
     # Store the following configuration in a configuration file
     # default to the following if nothing has been provided
-    self.utils_port  = 2048
-
-    self.superusers  = [ 'ka429' ]
-
-  def getSU( self ):
-    return self.superusers
+    self.server_port = 1024
+    self.server_addr = 'ecelinux-01.ece.cornell.edu'

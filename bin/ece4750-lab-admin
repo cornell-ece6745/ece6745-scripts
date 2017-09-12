@@ -69,9 +69,9 @@ opts = parse_cmdline()
 # Constants
 #-------------------------------------------------------------------------
 
-from server_config import server_config
+from global_config import global_config
 
-configs = server_config()
+gConfigs = global_config()
 
 #-------------------------------------------------------------------------
 # Connection utilities
@@ -121,7 +121,7 @@ def recv_data ( sock, drastic = False ):
 sock = None
 
 try:
-  sock = socket.create_connection(( configs.server_addr, configs.server_port ))
+  sock = socket.create_connection(( gConfigs.server_addr, gConfigs.server_port ))
 except:
   print 'ERROR: cannot connect to server'
   quit ( -1 )

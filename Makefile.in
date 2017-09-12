@@ -8,6 +8,7 @@ install_exes = \
   $(src_dir)/bin/ece4750-git-add \
   $(src_dir)/bin/ece4750-git-log \
   $(src_dir)/bin/trash \
+  $(src_dir)/bin/global_config.py \
   $(src_dir)/bin/server_config.py \
   $(src_dir)/bin/ece4750-lab-admin \
   $(src_dir)/bin/ece4750-lab-server \

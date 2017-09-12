@@ -26,10 +26,12 @@ sys.path.append("/classes/ece4750/install/venv-pkgs/x86_64-rhel7/python2.7.12/li
 #-------------------------------------------------------------------------
 
 from server_config import server_config
+from global_config import global_config
 
-configs = server_config()
+gConfigs = global_config()
+sConfigs = server_config()
 
-superusers = configs.getSU()
+superusers = sConfigs.getSU()
 admins     = superusers
 
 #-------------------------------------------------------------------------
@@ -286,6 +288,8 @@ update_db       = False
 force_update    = False
 server_started  = False
 
+sync_db         = threading.Event()
+
 # GitHub stuff
 
 from github import Github
@@ -463,9 +467,12 @@ def sync_database ():
   global update_db
   global force_update
   global reset_db
+  global sync_db
 
   # Infinit loop
   while True:
+
+    sync_db.wait(5)
 
     # Check if db_dirty
     if db_dirty or server_shutdown:
@@ -528,7 +535,6 @@ def update_group_description ( group_id ):
   global group_lock
   global student_info
   global group_info
-  global db_dirty
 
   global github_obj
   global course_org
@@ -561,6 +567,7 @@ def assign_github_id ( netid, github_id ):
   # Globals
   global student_info
   global db_dirty
+  global sync_db
 
   global github_obj
   global course_org
@@ -637,6 +644,9 @@ def assign_github_id ( netid, github_id ):
       # Database is dirty
       db_dirty = True
 
+      # Signal update thread
+      sync_db.set()
+
     except:
       ret = 16
       msg =  'Failed to add GitHub ID.' + \
@@ -708,6 +718,7 @@ def create_group ( netid ):
   global student_info
   global group_info
   global db_dirty
+  global sync_db
 
   global github_obj
   global course_org
@@ -773,6 +784,9 @@ def create_group ( netid ):
         # Database needs update
         db_dirty = True
 
+        # Signal update thread
+        sync_db.set()
+
       else:
         # Properly didn't accept invitation
         ret = -19
@@ -795,6 +809,7 @@ def leave_group ( netid ):
   global student_info
   global group_info
   global db_dirty
+  global sync_db
 
   global github_obj
   global course_org
@@ -863,6 +878,9 @@ def leave_group ( netid ):
     # Database needs update
     db_dirty = True
 
+    # Signal update thread
+    sync_db.set()
+
     # Release lock
     group_lock.release()
 
@@ -885,6 +903,7 @@ def join_group ( netid, group_id ):
   global student_info
   global group_info
   global db_dirty
+  global sync_db
 
   global github_obj
   global course_org
@@ -936,6 +955,9 @@ def join_group ( netid, group_id ):
         # Dirty DB
         db_dirty = True
 
+        # Signal update thread
+        sync_db.set()
+
         # Done
         group_lock.release()
 
@@ -959,7 +981,6 @@ def pending_group ( netid ):
   global group_lock
   global student_info
   global group_info
-  global db_dirty
 
   global github_obj
   global course_org
@@ -1021,6 +1042,7 @@ def approve_group ( netid, o_netid ):
   global student_info
   global group_info
   global db_dirty
+  global sync_db
 
   global github_obj
   global course_org
@@ -1072,6 +1094,12 @@ def approve_group ( netid, o_netid ):
                 while o_netid in group_info[group_id]['pending_reqs']:
                   group_info[group_id]['pending_reqs'].remove( o_netid )
 
+                # Dirty DB
+                db_dirty = True
+
+                # Signal update thread
+                sync_db.set()
+
                 # Update github description
                 update_group_description( group_id )
 
@@ -1100,7 +1128,7 @@ def approve_group ( netid, o_netid ):
 
       else:
         ret = -310
-        msg = 'NetID {} has not pending join request to group {}.'.format( o_netid, group_id )
+        msg = 'NetID {} has no pending join-request to group {}.'.format( o_netid, group_id )
 
     elif group_status[0] == 'p':
       group_id = group_status[1]
@@ -1136,6 +1164,7 @@ def server_setup ( username, pwd ):
   global reset_db
   global db_dirty
   global server_started
+  global sync_db
 
   global github_obj
   global course_org
@@ -1174,6 +1203,10 @@ def server_setup ( username, pwd ):
       # If an update is pending
       db_dirty = True
 
+      # Signal update thread
+      sync_db.set()
+
+
   except GithubException as e:
     ret = -64
     msg =  'GitHub could NOT connect properly.' + \
@@ -1190,6 +1223,7 @@ def reset_database ():
   # Globals
   global reset_db
   global db_dirty
+  global sync_db
 
   # Return
   ret = -1
@@ -1206,6 +1240,9 @@ def reset_database ():
   # Database is super dirty
   db_dirty = True
 
+  # Signal update thread
+  sync_db.set()
+
   # Finish
   return ( ret, msg )
 
@@ -1218,6 +1255,7 @@ def update_database ( force = False ):
   global update_db
   global force_update
   global db_dirty
+  global sync_db
 
   # Return
   ret = -1
@@ -1235,6 +1273,9 @@ def update_database ( force = False ):
 
   # Database is super dirty
   db_dirty = True
+
+  # Signal update thread
+  sync_db.set()
 
   # Finish
   return ( ret, msg )
@@ -1498,7 +1539,7 @@ except:
   quit( -1 )
 
 # Time-out
-sock.settimeout(0.2)
+sock.settimeout(1)
 
 while not server_shutdown:
 

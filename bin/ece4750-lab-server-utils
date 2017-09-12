@@ -16,6 +16,13 @@ import os
 import sys
 import threading
 import socket
+import subprocess
+
+from server_config import server_config
+from global_config import global_config
+
+gConfigs = global_config()
+sConfigs = server_config()
 
 sys.path.append("/classes/ece4750/install/venv-pkgs/x86_64-rhel7/python2.7.12/lib/python2.7/site-packages/PyGithub-1.27.1-py2.7.egg")
 
@@ -84,6 +91,22 @@ def recv_data ( sock, drastic = False ):
   return data
 
 #-------------------------------------------------------------------------
+# Subshell stuff
+#-------------------------------------------------------------------------
+
+def subshell( cmd ):
+
+  process        = subprocess.Popen( cmd                    ,
+                                     stdin =subprocess.PIPE ,
+                                     stdout=subprocess.PIPE ,
+                                     shell=True             )
+  stdout, stderr = process.communicate()
+
+  del process
+
+  return stdout
+
+#-------------------------------------------------------------------------
 # Main servicing logic
 #-------------------------------------------------------------------------
 
@@ -111,10 +134,14 @@ def service_request( client, conn_point ):
       query = "netstat -nte 2>/dev/null | sed 's/^\\S\\+\\s\\+\\S\\+\\s\\+\\S\\+\\s\\+\\(\\S\\+:\\)\\([^: \\t]\\+\\)\\s\\+\\(\\S\\+:\\)\\([^: \\t]\\+\\)\\s\\+\\S\\+\\s\\+\\(\\S\\+\\)\\s\\+\\(\\S\\+\\)\\s\\+.*/\\1,\\2 -- \\3,\\4 -- \\5:\\6/'"
       query += " | grep '.*:,{} -- .*:,{}'".format( req[0], req[1] )
       query += " | sed 's/^\S\+:\S\+\s\+--\s\+\S\+:\S\+\s\+--\s\+\(\S\+\):\S\+$/\\1/'"
-      uid = os.popen(query).read()[:-1]
-      username = os.popen('id -nu {}'.format(uid)).read()[:-1]
+
+      uid      = subshell( query ).rstrip('\n')
+      query    = 'id -nu {}'.format(uid)
+      username = subshell( query ).rstrip('\n')
 
       send_data( client, username )
+
+      print 'Authorized user "{}"'.format( username )
 
   # Close connection
   client.close()
@@ -125,7 +152,7 @@ def service_request( client, conn_point ):
 sock = socket.socket( socket.AF_INET, socket.SOCK_STREAM )
 sock.setsockopt( socket.SOL_SOCKET, socket.SO_REUSEADDR, 1 )
 
-address = ('', 2048)
+address = ( '', sConfig.utils_port )
 
 try:
   sock.bind(address)
