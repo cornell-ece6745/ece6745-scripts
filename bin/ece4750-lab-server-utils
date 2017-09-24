@@ -17,6 +17,9 @@ import sys
 import threading
 import socket
 import subprocess
+import time
+import signal
+import datetime
 
 from server_config import server_config
 from global_config import global_config
@@ -25,6 +28,12 @@ gConfigs = global_config()
 sConfigs = server_config()
 
 sys.path.append("/classes/ece4750/install/venv-pkgs/x86_64-rhel7/python2.7.12/lib/python2.7/site-packages/PyGithub-1.27.1-py2.7.egg")
+
+#-------------------------------------------------------------------------
+# Global variables
+#-------------------------------------------------------------------------
+
+server_shutdown = False
 
 #-------------------------------------------------------------------------
 # Force flush for stdout
@@ -44,6 +53,72 @@ class Unbuffered(object):
        return getattr(self.stream, attr)
 
 sys.stdout = Unbuffered(sys.stdout)
+
+#-------------------------------------------------------------------------
+# Logging
+#-------------------------------------------------------------------------
+
+class Logger(object):
+
+  INFO = 0
+  WARN = 1
+  ERR  = 2
+
+  def __init__( s, printOutput=True, outputFile=None ):
+    s.printOutput = True
+    s.outputFile  = open( outputFile, 'a' ) if outputFile else None
+    s.startTime   = time.time()
+
+  def __print__ ( s, level, msg ):
+    ts     = time.time() - s.startTime
+    ts_str = '{:20.3f}'.format( ts )
+    t      = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+    level_name = ''
+
+    if level == s.INFO:
+      level_name = 'INFO   :'
+    if level == s.WARN:
+      level_name = 'WARNIMG:'
+    if level == s.ERR :
+      level_name = 'ERROR  :'
+
+    output_str = '[{}][{}] {} {}'.format( ts_str, t, level_name, msg )
+
+    if s.printOutput:
+      print output_str
+
+    if s.outputFile:
+      s.outputFile.write( output_str )
+
+  def warning ( s, msg ):
+    s.__print__( s.WARN, msg )
+
+  def error   ( s, msg ):
+    s.__print__( s.ERR , msg )
+
+  def info    ( s, msg ):
+    s.__print__( s.INFO, msg )
+
+logger = Logger()
+
+#-------------------------------------------------------------------------
+# Handle termination signal
+#-------------------------------------------------------------------------
+
+def sigint_handler (signal_num, frame):
+  global server_shutdown
+  global logger
+
+  print ''
+
+  logger.warning( 'Recieved signal ({}) ...'.format( signal_num ) )
+  logger.info( 'Server shutting down gracefully' )
+
+  server_shutdown = True
+ 
+signal.signal(signal.SIGINT , sigint_handler)
+signal.signal(signal.SIGTERM, sigint_handler)
 
 #-------------------------------------------------------------------------
 # Command Line Processing
@@ -131,6 +206,9 @@ def subshell( cmd ):
 
 def service_request( client, conn_point ):
 
+  # Globals
+  global logger
+
   # Retrieve actual arguments
   addr = conn_point[0]
   port = conn_point[1]
@@ -160,10 +238,17 @@ def service_request( client, conn_point ):
 
       send_data( client, username )
 
-      print 'Authorized user "{}"'.format( username )
+      logger.info( 'Authorized user "{}"'.format( username ) )
 
   # Close connection
   client.close()
+
+#-------------------------------------------------------------------------
+# Main execution logic
+#-------------------------------------------------------------------------
+
+# Announce the start of the utility server
+logger.info( 'Starting the utility server ...' )
 
 #-------------------------------------------------------------------------
 # Create a socket
@@ -172,6 +257,8 @@ sock = socket.socket( socket.AF_INET, socket.SOCK_STREAM )
 sock.setsockopt( socket.SOL_SOCKET, socket.SO_REUSEADDR, 1 )
 
 address = ( '', sConfigs.utils_port )
+
+logger.info( 'Attempting to listen to incoming connections on port {}'.format( sConfigs.utils_port ) )
 
 try:
   sock.bind(address)
@@ -185,7 +272,10 @@ except:
 # Main dispatch loop
 #-------------------------------------------------------------------------
 
-while True:
+# Time-out
+sock.settimeout(1)
+
+while not server_shutdown:
 
   try:
     client, address = sock.accept()
