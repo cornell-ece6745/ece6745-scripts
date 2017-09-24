@@ -18,6 +18,7 @@ import sys
 import os
 import datetime
 import signal
+import time
 
 # Database backend
 import json
@@ -60,6 +61,54 @@ class Unbuffered(object):
        return getattr(self.stream, attr)
 
 sys.stdout = Unbuffered(sys.stdout)
+
+#-------------------------------------------------------------------------
+# Logging
+#-------------------------------------------------------------------------
+
+class Logger(object):
+
+  INFO = 0
+  WARN = 1
+  ERR  = 2
+
+  def __init__( s, printOutput=True, outputFile=None ):
+    s.printOutput = True
+    s.outputFile  = open( outputFile, 'a' ) if outputFile else None
+    s.startTime   = time.time()
+
+  def __print__ ( s, level, msg ):
+    ts     = time.time() - s.startTime
+    ts_str = '{:20.3f}'.format( ts )
+    t      = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+    level_name = ''
+
+    if level == s.INFO:
+      level_name = 'INFO   :'
+    if level == s.WARN:
+      level_name = 'WARNIMG:'
+    if level == s.ERR :
+      level_name = 'ERROR  :'
+
+    output_str = '[{}][{}] {} {}'.format( ts_str, t, level_name, msg )
+
+    if s.printOutput:
+      print output_str
+
+    if s.outputFile:
+      s.outputFile.write( output_str )
+
+  def warning ( s, msg ):
+    s.__print__( s.WARN, msg )
+
+  def error   ( s, msg ):
+    s.__print__( s.ERR , msg )
+
+  def info    ( s, msg ):
+    s.__print__( s.INFO, msg )
+
+logger = Logger()
 
 #-------------------------------------------------------------------------
 # Command Line Processing
@@ -1542,10 +1591,31 @@ def service_request( client, conn_point ):
   client.close()
 
 #-------------------------------------------------------------------------
+# Handle termination signal
+#-------------------------------------------------------------------------
+
+def sigint_handler (signal_num, frame):
+  global server_shutdown
+  global logger
+
+  print ''
+
+  logger.warning( 'Recieved signal ({}) ...'.format( signal_num ) )
+  logger.info( 'Server shutting down gracefully' )
+
+  server_shutdown = True
+ 
+signal.signal(signal.SIGINT , sigint_handler)
+signal.signal(signal.SIGTERM, sigint_handler)
+
+#-------------------------------------------------------------------------
 # Dispatching logic
 #-------------------------------------------------------------------------
 # hawajkm: Instead of reading files, we actually have a proper inter-
 #          process communication through TCP/IP
+
+# Announce the start
+logger.info( 'Starting the server ...' )
 
 # Thread for updating the DB on the disk
 threading.Thread(target = sync_database).start()
@@ -1554,6 +1624,8 @@ sock = socket.socket( socket.AF_INET, socket.SOCK_STREAM )
 sock.setsockopt( socket.SOL_SOCKET, socket.SO_REUSEADDR, 1 )
 
 address = ( '', gConfigs.server_port )
+
+logger.info ( 'Listening to incoming connections at port {}'.format( gConfigs.server_port ) )
 
 try:
 
