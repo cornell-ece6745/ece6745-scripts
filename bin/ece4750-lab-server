@@ -49,16 +49,16 @@ admins     = superusers
 # https://stackoverflow.com/questions/107705
 
 class Unbuffered(object):
-   def __init__(self, stream):
-       self.stream = stream
-   def write(self, data):
-       self.stream.write(data)
-       self.stream.flush()
-   def writelines(self, datas):
-       self.stream.writelines(datas)
-       self.stream.flush()
-   def __getattr__(self, attr):
-       return getattr(self.stream, attr)
+  def __init__(self, stream):
+    self.stream = stream
+  def write(self, data):
+    self.stream.write(data)
+    self.stream.flush()
+  def writelines(self, datas):
+    self.stream.writelines(datas)
+    self.stream.flush()
+  def __getattr__(self, attr):
+    return getattr(self.stream, attr)
 
 sys.stdout = Unbuffered(sys.stdout)
 
@@ -78,8 +78,8 @@ class Logger(object):
     s.startTime   = time.time()
 
   def __print__ ( s, level, msg ):
-    ts     = time.time() - s.startTime
-    ts_str = '{:20.3f}'.format( ts )
+    ts     = round( time.time() - s.startTime , 3 )
+    ts_str = '{:12.3f}'.format( ts )
     t      = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
     level_name = ''
@@ -87,7 +87,7 @@ class Logger(object):
     if level == s.INFO:
       level_name = 'INFO   :'
     if level == s.WARN:
-      level_name = 'WARNIMG:'
+      level_name = 'WARNING:'
     if level == s.ERR :
       level_name = 'ERROR  :'
 
@@ -142,7 +142,6 @@ opts = parse_cmdline()
 base_path = '/classes/ece4750/staff/'
 
 database_path      = base_path + 'database/'
-students_path      = base_path + 'students/'
 
 student_list_file = database_path + 'student-list.txt'
 
@@ -544,6 +543,7 @@ def sync_database ():
   global force_update
   global reset_db
   global sync_db
+  global logger
 
   # Infinit loop
   while True:
@@ -570,12 +570,16 @@ def sync_database ():
         reset_db  = False
         update_db = False
 
+        logger.info( 'Database has been resetted!' )
+
       elif update_db:
         # This is far too complex to fit here
         if server_started:
           log = refresh_database ( force_update )
           update_db = False
           force_update = False
+
+          logger.info( 'Database has been updated' )
 
       # Update group database
       update_group_info()
@@ -585,8 +589,12 @@ def sync_database ():
       write_group_info()
 
       # Print log
+      logger.info( 'Database has been synchronized' )
       if log != '':
-        print '{}'.format( log )
+        logger.warning( 'Database synchronization log:' )
+
+        for line in log.split('\n'):
+          logger.warning( '  {}'.format( line ) )
 
       # Reset dirty bit
       db_dirty = False
@@ -1596,6 +1604,7 @@ def service_request( client, conn_point ):
 
 def sigint_handler (signal_num, frame):
   global server_shutdown
+  global sync_db
   global logger
 
   print ''
@@ -1603,7 +1612,12 @@ def sigint_handler (signal_num, frame):
   logger.warning( 'Recieved signal ({}) ...'.format( signal_num ) )
   logger.info( 'Server shutting down gracefully' )
 
+  # Force a database sync
   server_shutdown = True
+
+  # Signal update thread
+  sync_db.set()
+
  
 signal.signal(signal.SIGINT , sigint_handler)
 signal.signal(signal.SIGTERM, sigint_handler)
