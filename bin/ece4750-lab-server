@@ -143,7 +143,7 @@ base_path = '/classes/ece4750/staff/'
 
 database_path      = base_path + 'database/'
 
-student_list_file = database_path + 'student-list.txt'
+class_roster_file = database_path + 'class_roster.csv'
 
 student_info_file = database_path + 'student-info.json'
 student_csv_file  = database_path + 'student-info.csv'
@@ -151,7 +151,6 @@ student_csv_file  = database_path + 'student-info.csv'
 group_info_file   = database_path + 'group-info.json'
 group_csv_file    = database_path + 'group-info.csv'
 
-student_name = {}                                                 
 student_info = {}
 group_info   = {}
 
@@ -271,7 +270,7 @@ def write_group_info():
     for gid in group_info.keys():
       csvw.writerow( [gid] + group_info[gid]['members'] )
 
-def send_email( netid, title, kind, success=True):
+def send_email( netid, name, title, kind, success=True):
   global server
   
   From    = "ece4750.bot@gmail.com"
@@ -292,7 +291,7 @@ You recently submitted {} request {}.
 
 Yours Truly,
 ECE4750-bot
-'''.format( student_name[netid], kind, text )
+'''.format( name, kind, text )
 
   message = "From: %s\r\n" % From \
           + "To: %s\r\n" % ",".join(To) \
@@ -466,43 +465,101 @@ def refresh_database ( force = False ):
   # Log!
   log = ''
 
-  if os.path.exists( student_list_file ):
+  if os.path.exists( class_roster_file ):
 
     # Dictionary for students
-    students = {}
+    class_roster = {}
 
     # Load all students
-    with open( student_list_file, 'r' ) as fp:
-      for line in fp.readlines():
-        strs = line.rstrip('\n').split('\t')
-    
-        students[ strs[0] ] = strs[1]
+    with open( class_roster_file, 'r' ) as fp:
+
+      db_raw = csv.DictReader( fp )
+
+      for row in db_raw:
+        netid = row['NET ID']
+        name  = row['NAME'].split(',')
+        name  = [ x.strip() for x in name ]
+        name  = ' '.join(list(reversed( name )))
+
+        class_roster[netid] = row
+        class_roster[netid]['NAME'] = name
 
     # Add new students
-    for netid in sorted( students.keys() ):
+    for netid in sorted( class_roster.keys() ):
+
+      name   = class_roster[netid]['NAME']
+      status = class_roster[netid]['GRADING BASIS']
+
+      if   status == 'GRV':
+        status = 'g'
+      elif status == 'AUD':
+        status = 'a'
+      else:
+        status = 'u'
+
+      # Add!
       if not (netid in student_info.keys()):
 
-        if log != '':
-          log += '\n'
-        log += 'Adding {} ({})'.format( students[netid], netid )
+        log += '\n' if log != '' else ''
+        log += 'Adding {}'.format( netid )
 
-        student_info[netid] = {
-                                'name'     : students[netid],
-                                'group'    : None           ,
-                                'github_id': None           ,
-                                'slipdays' : 3              ,
-                              }
+        student_info[netid] = {}
+
+        #student_info[netid]['name'     ] = name
+        #student_info[netid]['group'    ] = None
+        #student_info[netid]['github_id'] = None
+        #student_info[netid]['slipdays' ] = 3
+        #student_info[netid]['status'   ] = status
+
+      # Check if updated!
+
+      if not ('name' in student_info[netid] and student_info[netid]['name'] == name):
+        old_name = student_info[netid]['name'] if ('name' in student_info[netid]) else ''
+
+        student_info[netid]['name'] = name
+
+        log += '\n' if log != '' else ''
+        log += 'Updating {}\'s name from "{}" to "{}"'.format( netid, old_name, name )
+
+      if not ('status' in student_info[netid] and student_info[netid]['status'] == status):
+        old_status = student_info[netid]['status'] if ('status' in student_info[netid]) else ''
+
+        student_info[netid]['status'] = status
+
+        log += '\n' if log != '' else ''
+        log += 'Updating {}\'s status from "{}" to "{}"'.format( netid, old_status, status )
+
+      if not 'group' in student_info[netid]:
+
+        student_info[netid]['group'] = None
+
+        log += '\n' if log != '' else ''
+        log += 'Initializing {}\'s group to None'.format( netid )
+
+      if not 'slipdays' in student_info[netid]:
+
+        student_info[netid]['slipdays'] = 3
+
+        log += '\n' if log != '' else ''
+        log += 'Initializing {}\'s slipdays to 3'.format( netid )
+
+      if not 'github_id' in student_info[netid]:
+
+        student_info[netid]['github_id'] = None
+
+        log += '\n' if log != '' else ''
+        log += 'Initializing {}\'s GitHub ID to None'.format( netid )
 
     # Experimental ... :)
     # Delete departing students ...
     for netid in student_info.keys():
 
-      if not netid in students.keys():
+      if not netid in class_roster.keys():
         # Students dropped the course
         name = student_info[netid]['name']
         github_user = student_info[netid]['github_id']
 
-        if force:
+        if force or not github_user:
           if github_user:
             # Remove from the group
             leave_group( netid )
@@ -511,16 +568,23 @@ def refresh_database ( force = False ):
             try:
               course_org.remover_from_members( github_id )
             except:
+              # Probably add to blacklist?
               pass
 
           # Delete student's record
           del student_info[netid]
 
-        if not github_user:
-          github_user = ''
-        if log != '':
-          log += '\n'
-        log += 'Removing {} ({}) ({})'.format( name, netid, github_user )
+          # Logging
+          log += '\n' if log != '' else ''
+          if github_user:
+            log += 'Removing {} (name={}, github_id={})'.format( netid, name, github_user )
+          else:
+            log += 'Removing {} (name={})'.format( netid, name )
+
+        # Force was not set!
+        elif github_user:
+          log += '\n' if log != '' else ''
+          log += 'Can not softly remove {} (name={}, github_id={})'.format( netid, name, github_user )
 
   # :)
   return log
@@ -538,7 +602,6 @@ def sync_database ():
   global group_info
   global db_dirty
   global stall_requests
-  global student_name
   global update_db
   global force_update
   global reset_db
