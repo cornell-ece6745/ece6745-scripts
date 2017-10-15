@@ -1363,6 +1363,29 @@ def server_setup ( username, pwd ):
   return ( ret, msg )
 
 #=========================================
+# Get groups as a dictionary
+#=========================================
+def get_groups_dict ():
+
+  # Globals
+  global group_info
+
+  # Return
+  ret =  0
+  msg = ''
+
+  group_dict = {}
+
+  for group_id in group_info:
+
+    group_dict[group_id] = group_info[group_id]['members']
+
+  msg = '{}'.format(group_dict)
+
+  # Finish
+  return ( ret, msg )
+
+#=========================================
 # Resetting the database
 #=========================================
 def reset_database ():
@@ -1482,7 +1505,7 @@ def execute_command( netid, cmd, args ):
           ret = -7
           msg = 'Not enough arguments supplied for "server setup"'
 
-      # Setup the server
+      # Shutdown the server gracefully
       elif args[0] == 'quit':
         # Signal a shutdown
         server_shutdown = True
@@ -1490,6 +1513,11 @@ def execute_command( netid, cmd, args ):
         ret = 0
         msg =   'Shutting down the server.' + \
               '\nPending requests followed by a database sync will be execuetd'
+
+      # Construct a dictionary for groups
+      elif args[0] == 'groups':
+        # Get the groups assignments
+        ret, msg = get_groups_dict()
 
       # Initialize group repos
       elif args[0] == 'init_repos':
