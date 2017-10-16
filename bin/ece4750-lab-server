@@ -140,6 +140,7 @@ opts = parse_cmdline()
 #-------------------------------------------------------------------------
 
 base_path = '/classes/ece4750/staff/'
+base_path = './'
 
 database_path      = base_path + 'database/'
 
@@ -1365,7 +1366,7 @@ def server_setup ( username, pwd ):
 #=========================================
 # Get groups as a dictionary
 #=========================================
-def get_groups_dict ():
+def get_groups_dict ( succinct=False ):
 
   # Globals
   global group_info
@@ -1380,7 +1381,12 @@ def get_groups_dict ():
 
     group_dict[group_id] = group_info[group_id]['members']
 
-  msg = '{}'.format(group_dict)
+  msg = ''
+
+  if not succinct:
+    msg += 'Groups JSON:\n\n'
+
+  msg += '{}'.format( json.dumps( group_dict ) )
 
   # Finish
   return ( ret, msg )
@@ -1514,10 +1520,15 @@ def execute_command( netid, cmd, args ):
         msg =   'Shutting down the server.' + \
               '\nPending requests followed by a database sync will be execuetd'
 
-      # Construct a dictionary for groups
+      # Get a dictionary for groups
       elif args[0] == 'groups':
         # Get the groups assignments
-        ret, msg = get_groups_dict()
+        ret, msg = get_groups_dict( succinct=False )
+
+      # Get a watered-down dictionary for groups
+      elif args[0] == 'ugroups':
+        # Get the groups assignments
+        ret, msg = get_groups_dict( succinct=True  )
 
       # Initialize group repos
       elif args[0] == 'init_repos':
