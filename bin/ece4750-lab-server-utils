@@ -228,17 +228,22 @@ def service_request( client, conn_point ):
     if data:
       req   = data.split( '\n' )
       # Make this pretty :)
-      query = "netstat -nte 2>/dev/null | sed 's/^\\S\\+\\s\\+\\S\\+\\s\\+\\S\\+\\s\\+\\(\\S\\+:\\)\\([^: \\t]\\+\\)\\s\\+\\(\\S\\+:\\)\\([^: \\t]\\+\\)\\s\\+\\S\\+\\s\\+\\(\\S\\+\\)\\s\\+\\(\\S\\+\\)\\s\\+.*/\\1,\\2 -- \\3,\\4 -- \\5:\\6/'"
-      query += " | grep '.*:,{} -- .*:,{}'".format( req[0], req[1] )
-      query += " | sed 's/^\S\+:\S\+\s\+--\s\+\S\+:\S\+\s\+--\s\+\(\S\+\):\S\+$/\\1/'"
-
+      query = "netstat -nte 2>/dev/null | sed 's/^\\S\\+\\s\\+\\S\\+\\s\\+\\S\\+\\s\\+\\(\\S\\+\\):\\([^: \\t]\\+\\)\\s\\+\\(\\S\\+\\):\\([^: \\t]\\+\\)\\s\\+\\(\\S\\+\\)\\s\\+\\(\\S\\+\\)\\s\\+\\(\\S\\+\\)\\s\\+.*/\\1,\\2 -- \\3,\\4 -- \\5 -- \\6:\\7/'"
+      query += " | grep '.*,{} -- .*,{} -- ESTABLISHED'".format( req[0], req[1] )
+      query += " | sed 's/^\S\+,\S\+\s\+--\s\+\S\+,\S\+\s\+--\s\+\S\+\s\+--\s\+\(\S\+\):\S\+$/\\1/'"
       uid      = subshell( query ).rstrip('\n')
-      query    = 'id -nu {}'.format(uid)
-      username = subshell( query ).rstrip('\n')
+
+      username = ''
+      if uid.rstrip():
+        query    = 'id -nu {}'.format(uid)
+        username = subshell( query ).rstrip('\n')
 
       send_data( client, username )
 
-      logger.info( 'Authorized user "{}"'.format( username ) )
+      if username:
+        logger.info( 'Authorized user "{}" (uid={})'.format( username, uid ) )
+      else:
+        logger.warning( 'Could not authorize a user' )
 
   # Close connection
   client.close()
