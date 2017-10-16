@@ -140,7 +140,6 @@ opts = parse_cmdline()
 #-------------------------------------------------------------------------
 
 base_path = '/classes/ece4750/staff/'
-base_path = './'
 
 database_path      = base_path + 'database/'
 
