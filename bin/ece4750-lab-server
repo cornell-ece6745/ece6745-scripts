@@ -1003,7 +1003,7 @@ def leave_group ( netid ):
 
       # Clone for the student
       # Create a token
-      auth = github_obj.get_user().create_authroization(scopes=['repo', 'user'], note='temp_key')
+      auth = github_obj.get_user().create_authorization(scopes=['repo', 'user'], note='temp_key')
 
       # Get latest commit on the repo
       repo   = course_org.get_repo( team_name )
