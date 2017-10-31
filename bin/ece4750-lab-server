@@ -29,6 +29,9 @@ import csv
 import socket
 import threading
 
+# Random
+from random import *
+
 sys.path.append("/classes/ece4750/install/venv-pkgs/x86_64-rhel7/python2.7.12/lib/python2.7/site-packages/PyGithub-1.27.1-py2.7.egg")
 
 #-------------------------------------------------------------------------
@@ -1003,7 +1006,15 @@ def leave_group ( netid ):
 
       # Clone for the student
       # Create a token
-      auth = github_obj.get_user().create_authorization(scopes=['repo', 'user'], note='temp_key')
+      trails = 0
+      auth = None
+      while auth == None and trails < 10:
+        try:
+          key_name = 'temp_key_{:06d}'.format(randint(0, 999999))
+          auth = github_obj.get_user().create_authorization(scopes=['repo', 'user'], note='temp_key')
+          trails = trails +  1
+        except:
+          auth = None
 
       # Get latest commit on the repo
       repo   = course_org.get_repo( team_name )
