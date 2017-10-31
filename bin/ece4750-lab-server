@@ -19,6 +19,7 @@ import os
 import datetime
 import signal
 import time
+import subprocess
 
 # Database backend
 import json
@@ -134,6 +135,22 @@ def parse_cmdline():
   return opts
 
 opts = parse_cmdline()
+
+#-------------------------------------------------------------------------
+# Subshell stuff
+#-------------------------------------------------------------------------
+
+def subshell( cmd ):
+
+  process        = subprocess.Popen( cmd                    ,
+                                     stdin =subprocess.PIPE ,
+                                     stdout=subprocess.PIPE ,
+                                     shell=True             )
+  stdout, stderr = process.communicate()
+
+  del process
+
+  return stdout
 
 #-------------------------------------------------------------------------
 # Paths
@@ -983,6 +1000,40 @@ def leave_group ( netid ):
 
       github_id = github_obj.get_user( student_info[netid]['github_id'] )
       team.remove_from_members( github_id )
+
+      # Clone for the student
+      # Create a token
+      auth = github_obj.get_user().create_authroization(scopes=['repo', 'user'], note='temp_key')
+
+      # Get latest commit on the repo
+      repo   = course_org.get_repo( team_name )
+      commit = repo.get_commits()[0].sha[0:11]
+
+      # Get new repo
+      shadow_name = team_name + "_" + commit
+      try:
+        shadow_repo = course_org.get_repo( shadow_name )
+      except:
+        course_org.create_repo( shadow_name )
+        shadow_repo = course_org.get_repo( shadow_name )
+
+      # Copy the repo
+      gh_uname = github_obj.get_user().login
+      gh_pwd   = auth.token
+      org_name = course_org.login
+      src_repo = team_name
+      dst_repo = shadow_name
+
+      cmd = 'ece4750-copy-repo {} {} {} {}'.format( gh_uname, gh_pwd  ,
+                                                    org_name, src_repo,
+                                                    dst_repo,         )
+      subshell( cmd )
+
+      # Add user
+      shadow_repo.add_to_collaborators( github_id )
+
+      # Remove authorization token
+      auth.delete()
 
       # Update Group
       while netid in group_info[group_id]['members']:

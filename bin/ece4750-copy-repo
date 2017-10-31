@@ -1,0 +1,36 @@
+#!/bin/sh
+
+# Get arguments
+if [[ $# -lt 5 ]]; then
+  echo "You need five arguments to run this script"
+  echo " $0 <username> <password> <org> <source> <destination>"
+  echo "$#"
+  exit -1
+fi
+
+username=$1
+password=$2
+org_name=$3
+src_repo=$4
+dst_repo=$5
+
+# Maintain stuff
+current_dir=$(pwd)
+
+# Clean-up
+rm -rf repo_A
+
+# Get the source
+git clone --mirror https://${username}:${password}@github.com/${org_name}/${src_repo}.git repo_A
+
+# get into the source
+cd repo_A
+
+# do stuff!
+git push --mirror https://${username}:${password}@github.com/${org_name}/${dst_repo}.git
+
+# Go back
+cd ${current_dir}
+
+# Clean up
+rm -rf repo_A
