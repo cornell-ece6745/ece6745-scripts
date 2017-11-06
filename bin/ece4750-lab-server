@@ -224,11 +224,19 @@ else:
 # Utils
 #-------------------------------------------------------------------------
 
-def find_empty_group():
+def find_empty_group( status ):
   global group_info
-  for i in xrange(1, 41):
-    if (not str(i) in group_info.keys()) or (len(group_info[str(i)]['members']) == 0):
-      return str(i)
+
+  if status == 'g':
+    for gid in [ str(x) for x in xrange(1, 41) ]:
+      if (not gid in group_info.keys()) or (len(group_info[gid]['members']) == 0):
+        return gid
+
+  if status == 'a':
+    for gid in [ 'a{}'.format(x) for x in xrange(1, 41) ]:
+      if (not gid in group_info.keys()) or (len(group_info[gid]['members']) == 0):
+        return gid
+
   return None
 
 def write_student_info():
@@ -709,7 +717,10 @@ def update_group_description ( group_id ):
   global groups_teams
 
   # Get GitHub team
-  group_name = 'lab-group{:02d}'.format( int( group_id ) )
+  if group_id[0] == 'a':
+    group_name = 'audit-group{:02d}'.format( int( group_id[1:] ) )
+  else:
+    group_name = 'lab-group{:02d}'.format( int( group_id ) )
 
   repo = course_org.get_repo( group_name )
 
@@ -919,7 +930,7 @@ def create_group ( netid ):
     group_lock.acquire()
 
     # Find an empty group
-    group_id = find_empty_group()
+    group_id = find_empty_group( student_info[netid]['status'] )
 
     if group_id == None:
       ret = -16
@@ -931,15 +942,45 @@ def create_group ( netid ):
       github_id = github_obj.get_user( github_user )
 
       if course_org.has_in_members( github_id ):
-        team_name = 'lab-group{:02d}'.format( int( group_id ) )
-        team = groups_teams[team_name]
 
-        team.add_to_members( github_id )
+        if group_id[0] == 'a':
 
-        student_info[netid]['group'] = ['c', group_id]
+          #==================
+          # Auditing students
+          #==================
 
-        ret = 0
-        msg = 'Group "{}" was successfully created.'.format( group_id )
+          group_name = 'audit-group{:02d}'.format( int( group_id[1:] ) )
+
+          # Create the team
+          team = course_org.create_team( group_name )
+          team.add_to_members( github_id )
+
+          # Create the repo
+          repo = course_org.create_repo( group_name, private = True )
+          team.edit( group_name, permission = 'push' )
+          team.add_to_repos( repo )
+
+          student_info[netid]['group'] = ['c', group_id]
+
+          ret = 0
+          msg = 'Group "{}" was successfully created.'.format( group_id )
+
+        else:
+
+          #==================
+          # Graded students
+          #==================
+
+          team_name = 'lab-group{:02d}'.format( int( group_id ) )
+          team = groups_teams[team_name]
+
+          team.add_to_members( github_id )
+
+          student_info[netid]['group'] = ['c', group_id]
+
+          ret = 0
+          msg = 'Group "{}" was successfully created.'.format( group_id )
+
 
         # Update Groups
         group_info[group_id] = { 'members'      : [ netid ],
@@ -1025,7 +1066,7 @@ def leave_group ( netid ):
       try:
         shadow_repo = course_org.get_repo( shadow_name )
       except:
-        course_org.create_repo( shadow_name )
+        course_org.create_repo( shadow_name, private = True )
         shadow_repo = course_org.get_repo( shadow_name )
 
       # Copy the repo
