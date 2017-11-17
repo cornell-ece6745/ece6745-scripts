@@ -159,9 +159,9 @@ def subshell( cmd ):
 # Paths
 #-------------------------------------------------------------------------
 
-base_path = '/classes/ece4750/staff/'
+base_path         = '/classes/ece4750/staff/'
 
-database_path      = base_path + 'database/'
+database_path     = base_path + 'database/'
 
 class_roster_file = database_path + 'class_roster.csv'
 
@@ -642,6 +642,9 @@ def sync_database ():
   while True:
 
     sync_db.wait(5)
+
+    # Reset event just in case
+    sync_db.clear()
 
     # Check if db_dirty
     if db_dirty or server_shutdown:
