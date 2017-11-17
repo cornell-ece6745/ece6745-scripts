@@ -171,6 +171,8 @@ student_csv_file  = database_path + 'student-info.csv'
 group_info_file   = database_path + 'group-info.json'
 group_csv_file    = database_path + 'group-info.csv'
 
+executable_path   = os.path.dirname(os.path.realpath(__file__))
+
 student_info = {}
 group_info   = {}
 
@@ -1076,7 +1078,8 @@ def leave_group ( netid ):
       src_repo = team_name
       dst_repo = shadow_name
 
-      cmd = 'ece4750-copy-repo {} {} {} {}'.format( gh_uname, gh_pwd  ,
+      gh_copy = executable_path + '/ece4750-copy-repo'
+      cmd     = gh_copy + ' {} {} {} {} {}'.format( gh_uname, gh_pwd  ,
                                                     org_name, src_repo,
                                                     dst_repo,         )
       subshell( cmd )
@@ -1834,6 +1837,9 @@ signal.signal(signal.SIGTERM, sigint_handler)
 
 # Announce the start
 logger.info( 'Starting the server ...' )
+
+# Where are we? :)
+logger.info( 'Server path is set to {}'.format( executable_path ) )
 
 # Thread for updating the DB on the disk
 threading.Thread(target = sync_database).start()
