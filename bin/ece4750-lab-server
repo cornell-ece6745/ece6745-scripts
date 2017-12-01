@@ -242,7 +242,7 @@ def load_assignments_info():
       for slipdays_entry in slipdays_csv:
         net_id       = slipdays_entry[0]
         num_slipdays = slipdays_entry[1]
-        assignments_info[a_id]['slipdays'][net_id] = num_slipdays
+        assignments_info[a_id]['slipdays'][net_id] = int( num_slipdays )
 
 # Shunning email spamming bot :)
 
