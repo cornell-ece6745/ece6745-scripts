@@ -187,7 +187,7 @@ import logging
 # Functions to update/load databases
 #-------------------------------------------------------------------------
 
-def load_student_info()
+def load_student_info():
 
   global student_info
   
