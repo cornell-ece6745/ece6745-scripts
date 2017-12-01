@@ -1884,7 +1884,7 @@ def execute_command( netid, cmd, args ):
 
       # Assignments
       elif args[0] == 'update-assignments':
-        ret, msg = update_assignments()
+        ret, msg = refresh_assignments()
 
       # Not defined
       else:
