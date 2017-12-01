@@ -159,19 +159,22 @@ def subshell( cmd ):
 # Paths
 #-------------------------------------------------------------------------
 
-base_path         = '/classes/ece4750/staff/'
+base_path             = '/classes/ece4750/staff/'
 
-database_path     = base_path + 'database/'
+database_path         = base_path     + 'database/'
+assignments_path      = database_path + 'assignments/'
 
-class_roster_file = database_path + 'class_roster.csv'
+class_roster_file     = database_path + 'class_roster.csv'
 
-student_info_file = database_path + 'student-info.json'
-student_csv_file  = database_path + 'student-info.csv'
+student_info_file     = database_path + 'student-info.json'
+student_csv_file      = database_path + 'student-info.csv'
 
-group_info_file   = database_path + 'group-info.json'
-group_csv_file    = database_path + 'group-info.csv'
+group_info_file       = database_path + 'group-info.json'
+group_csv_file        = database_path + 'group-info.csv'
 
-executable_path   = os.path.dirname(os.path.realpath(__file__))
+assignments_info_file = database_path + 'assignments.json'
+
+executable_path       = os.path.dirname(os.path.realpath(__file__))
 
 student_info = {}
 group_info   = {}
@@ -179,6 +182,66 @@ group_info   = {}
 import smtplib
 import binascii
 import logging
+
+#-------------------------------------------------------------------------
+# Functions to update/load databases
+#-------------------------------------------------------------------------
+
+def load_student_info()
+
+  global student_info
+  
+  student_info = {}
+  if os.path.exists( student_info_file ):
+    with open( student_info_file, 'r' ) as fp:
+      student_info = json.load( fp )
+  else:
+    init_db_dirty = init_db_dirty | True
+
+def load_group_info():
+
+  global group_info
+
+  group_info = {}
+  if os.path.exists( group_info_file ):
+    with open( group_info_file, 'r' ) as fp:
+      group_info = json.load( fp )
+  else:
+    init_db_dirty = init_db_dirty | True
+
+def load_assignments_info():
+
+  global assignments_info
+
+  assignments_metadata = {}
+  if os.path.exists( assignments_info_file ):
+    with open( assignments_info_file, 'r' ) as fp:
+      assignments_metadata = json.load( fp )
+  
+  assignments_info = {}
+  for a_id in assignments_metadata:
+  
+    name          = assignments_metadata[a_id]['name']
+    slipdays_file = assignments_path + assignments_metadata[a_id]['slipdays']
+  
+    # Load slipdays in a dictionary
+    if not os.path.exists( slipdays_file ):
+      continue
+  
+    assignments_info[a_id]             = {}
+    assignments_info[a_id]['name']     = name
+    assignments_info[a_id]['slipdays'] = {}
+  
+    slipdays_dict = {}
+  
+    # Load slipdays as a database
+    with open( slipdays_file, 'r' ) as fp:
+      slipdays_csv = csv.reader( fp )
+  
+      for slipdays_entry in slipdays_csv:
+        net_id       = slipdays_entry[0]
+        num_slipdays = slipdays_entry[1]
+        assignments_info[a_id]['slipdays'][net_id] = num_slipdays
 
 # Shunning email spamming bot :)
 
@@ -208,19 +271,14 @@ import logging
 
 init_db_dirty = False
 
-student_info = {}
-if os.path.exists( student_info_file ):
-  with open( student_info_file, 'r' ) as fp:
-    student_info = json.load( fp )
-else:
-  init_db_dirty = init_db_dirty | True
+# Load students database
+load_student_info()
 
-group_info = {}
-if os.path.exists( group_info_file ):
-  with open( group_info_file, 'r' ) as fp:
-    group_info = json.load( fp )
-else:
-  init_db_dirty = init_db_dirty | True
+# Load groups information
+load_group_info()
+
+# Load assignements Information
+load_assignments_info()
 
 #-------------------------------------------------------------------------
 # Utils
@@ -389,6 +447,7 @@ server_shutdown = False
 stall_requests  = False
 reset_db        = False
 update_db       = False
+refresh_db      = False
 force_update    = False
 server_started  = False
 
@@ -630,6 +689,7 @@ def sync_database ():
   global server_shutdown
   global student_info
   global group_info
+  global assignments_info
   global db_dirty
   global stall_requests
   global update_db
@@ -657,6 +717,11 @@ def sync_database ():
 
       # Wait for requests in-flight
       wait_for_updaters()
+
+      # Process refresh requests
+      if refresh_db:
+
+        load_assignments_info()
 
       # Check pending requests
       if   reset_db:
@@ -705,6 +770,76 @@ def sync_database ():
 #-------------------------------------------------------------------------
 # Helper functions
 #-------------------------------------------------------------------------
+
+#=========================================
+# Get students status
+#=========================================
+def get_student_status ( netid, github_id, group ):
+
+  # Globals
+  global student_info
+  global assignments_info
+  global superusers
+  global server_started
+  global server_shutdown
+
+  slipdays = student_info[netid]['slipdays']
+
+  ret = 0
+  msg = 'Your NetID is {}'.format(netid)
+  if github_id:
+    msg += '\nYour GitHub ID is set to "{}"'.format(github_id)
+  else:
+    msg += '\nYour GitHub ID has NOT been set.'
+  if group:
+    if   group[0] == 'c':
+      msg += '\nYou are assigned to group {}'.format(group[1])
+    elif group[0] == 'p':
+      msg += '\nYou have a pending joining request to group {}'.format(group[1])
+    else:
+      msg += '\nYou have a corrupted group record.'
+  else:
+    msg += '\nYou are NOT assigned to any group.'
+
+  used_slipdays = 0
+
+  # Construct a table for slipdays
+  len_hdr = len( 'Assignment' )
+  header = 'Assignment\tUsed slipdays'.expandtabs(10)
+  f_msg  = '\n'
+  f_msg += '\n' + header
+  f_msg += '\n' + ( '-' * len(header) )
+  # Slipdays
+  for a_id in assignments_info:
+    name    = assignments_info[a_id]['name'    ]
+    name    = name + ( ' ' * ( len_hdr - len( name ) ) )
+    
+    sd_list = assignments_info[a_id]['slipdays']
+    #slipdays = None
+    sd = 0
+    if netid in sd_list:
+      sd = sd_list[netid]
+
+    #if slipdays == None:
+    #  msg += '{}\t{}'
+    used_slipdays += sd
+
+    f_msg += '\n{}\t{}'.format( name, sd ).expandtabs(10)
+
+  f_msg += '\n' + ( '-' * len(header) )
+  tmp    = 'Total'
+  tmp    = tmp + ( ' ' * ( len_hdr - len(tmp) ) )
+  f_msg += '\n{}\t{}'.format( tmp, used_slipdays).expandtabs(10)
+  # End table
+
+  # Slipdays
+  msg += '\n'
+  msg += '\nRemaining slipdays {}'.format( slipdays - used_slipdays )
+
+  # Slipdays table
+  msg += f_msg
+
+  return ret, msg
 
 #=========================================
 # Update a group's description
@@ -1472,6 +1607,41 @@ def server_setup ( username, pwd ):
   return ( ret, msg )
 
 #=========================================
+# Get students list as a dictionary
+#=========================================
+def get_students_dict ( succinct=False ):
+
+  # Globals
+  global group_info
+  global student_info
+
+  # Return
+  ret =  0
+  msg = ''
+
+  students_dict = {}
+  students      = student_info.keys()
+
+  i = 0
+  for i in xrange( len( students ) ):
+
+    students_dict[i] = students[i]
+
+  msg = ''
+
+  if not succinct:
+    msg += 'Groups JSON:\n\n'
+
+  json_str = json.dumps( students_dict, sort_keys = True          ,
+                         indent = 2   , separators= ( ',', ': ' ) )
+
+  msg += '{}'.format( json_str )
+
+
+  # Finish
+  return ( ret, msg )
+
+#=========================================
 # Get groups as a dictionary
 #=========================================
 def get_groups_dict ( succinct=False ):
@@ -1494,7 +1664,10 @@ def get_groups_dict ( succinct=False ):
   if not succinct:
     msg += 'Groups JSON:\n\n'
 
-  msg += '{}'.format( json.dumps( group_dict ) )
+  json_str = json.dumps( group_dict, sort_keys = True          ,
+                         indent = 2, separators= ( ',', ': ' ) )
+
+  msg += '{}'.format( json_str )
 
   # Finish
   return ( ret, msg )
@@ -1564,6 +1737,36 @@ def update_database ( force = False ):
   # Finish
   return ( ret, msg )
 
+#=========================================
+# Update assignments
+#=========================================
+def refresh_assignments ():
+
+  # Globals
+  global update_db
+  global refresh_db
+  global force_update
+  global db_dirty
+  global sync_db
+
+  # Return
+  ret = -1
+  msg = ''
+
+  # Add a pending request for update
+  refresh_db = True
+
+  # Report
+  ret = 0
+  msg =   'Assignments database update was scheduled successfully' + \
+        '\nThe request will be executed during the next database sync'
+
+  # Signal update thread
+  sync_db.set()
+
+  # Finish
+  return ( ret, msg )
+
 #-------------------------------------------------------------------------
 # Execute commands routine
 #-------------------------------------------------------------------------
@@ -1605,6 +1808,7 @@ def execute_command( netid, cmd, args ):
         ret, msg = reset_database()
 
       # Update the database
+      # hawajkm: Keeping this for now!
       elif args[0] == 'update':
         force = False
         if len(args) > 1:
@@ -1628,6 +1832,35 @@ def execute_command( netid, cmd, args ):
         msg =   'Shutting down the server.' + \
               '\nPending requests followed by a database sync will be execuetd'
 
+      # Initialize group repos
+      elif args[0] == 'init_repos':
+        if server_started:
+          ret, msg = init_repos()
+        else:
+          ret = -10
+          msg = 'Server needs to be setup for this operation'
+
+      # Not defined
+      else:
+        ret = 2
+        msg = 'Operation "{}" is not defined as a server command.'.format( args[0] )
+
+    else:
+      # NetID is not in the database
+      ret = -5
+      msg = 'Your are not authorized to perform the requested operation'
+
+  # Admin specific commands
+  if cmd == 'students':
+    serviced = True
+    if netid_su:
+      # Update the database
+      if   args[0] == 'update':
+        force = False
+        if len(args) > 1:
+          force = args[1] == 'force'
+        ret, msg = update_database( force )
+
       # Get a dictionary for groups
       elif args[0] == 'groups':
         # Get the groups assignments
@@ -1638,13 +1871,19 @@ def execute_command( netid, cmd, args ):
         # Get the groups assignments
         ret, msg = get_groups_dict( succinct=True  )
 
-      # Initialize group repos
-      elif args[0] == 'init_repos':
-        if server_started:
-          ret, msg = init_repos()
-        else:
-          ret = -10
-          msg = 'Server needs to be setup for this operation'
+      # Get a students list
+      elif args[0] == 'list':
+        # Get list numbered from 0 to n-1
+        ret, msg = get_students_dict( succinct=False )
+
+      # Get a students list
+      elif args[0] == 'ulist':
+        # Get list numbered from 0 to n-1
+        ret, msg = get_students_dict( succinct=True )
+
+      # Assignments
+      elif args[0] == 'update-assignments':
+        ret, msg = update_assignments()
 
       # Not defined
       else:
@@ -1668,21 +1907,7 @@ def execute_command( netid, cmd, args ):
   if cmd == 'status':
     serviced = True
     if netid_exists:
-      ret = 0
-      msg = 'Your NetID is {}'.format(netid)
-      if github_id:
-        msg += '\nYour GitHub ID is set to "{}"'.format(github_id)
-      else:
-        msg += '\nYour GitHub ID has NOT been set.'
-      if group:
-        if   group[0] == 'c':
-          msg += '\nYou are assigned to group {}'.format(group[1])
-        elif group[0] == 'p':
-          msg += '\nYou have a pending joining request to group {}'.format(group[1])
-        else:
-          msg += '\nYou have a corrupted group record.'
-      else:
-        msg += '\nYou are NOT assigned to any group.'
+      ret, msg = get_student_status( netid, github_id, group )
     else:
       # NetID is not in the database
       ret = 1

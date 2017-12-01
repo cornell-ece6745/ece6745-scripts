@@ -56,8 +56,8 @@ def parse_cmdline():
 
   p.add_argument(       '--server',          nargs = '+'          )
   p.add_argument(       '--github',          nargs = '+'          )
-  p.add_argument(       '--make-request',    nargs = '+'          )
   p.add_argument(       '--group',           nargs = '+'          )
+  p.add_argument(       '--students',        nargs = '+'          )
 
   opts = p.parse_args()
   if opts.help: p.error()
@@ -194,6 +194,20 @@ if opts.server:
 
   # Send request
   req = 'server\n{}\n{}'.format( cmd, args )
+  send_data( sock, req )
+
+  # Get resposne
+  res_raw = recv_data( sock )
+
+if opts.students:
+  # Get command and argument
+  cmd = opts.students[0]
+  args = ''
+  if len( opts.students ) > 1:
+    args = '\n'.join( opts.students[1:] )
+
+  # Send request
+  req = 'students\n{}\n{}'.format( cmd, args )
   send_data( sock, req )
 
   # Get resposne
