@@ -32,6 +32,9 @@ import threading
 # Random
 from random import *
 
+# Math stuff
+from math import ceil
+
 sys.path.append("/classes/ece4750/install/venv-pkgs/x86_64-rhel7/python2.7.12/lib/python2.7/site-packages/PyGithub-1.27.1-py2.7.egg")
 
 #-------------------------------------------------------------------------
@@ -707,6 +710,11 @@ def sync_database ():
     # Reset event just in case
     sync_db.clear()
 
+    # Process refresh requests
+    if refresh_db:
+
+      load_assignments_info()
+
     # Check if db_dirty
     if db_dirty or server_shutdown:
 
@@ -718,11 +726,6 @@ def sync_database ():
 
       # Wait for requests in-flight
       wait_for_updaters()
-
-      # Process refresh requests
-      if refresh_db:
-
-        load_assignments_info()
 
       # Check pending requests
       if   reset_db:
@@ -773,9 +776,55 @@ def sync_database ():
 #-------------------------------------------------------------------------
 
 #=========================================
-# Get students status
+# Boyer-Moore Algorithm
 #=========================================
-def get_student_status ( netid, github_id, group ):
+def get_majority_vote ( array ):
+
+  # State
+  count = 0
+  vote  = 0
+
+  # Iterate
+  for e in array:
+
+    if count == 0:
+      # We have a new candidate
+      vote = e
+      count += 1
+
+    else:
+
+      # Voting
+      if e == vote:
+        count += 1
+      else:
+        count -= 1
+
+  return ( (count > 0), vote )
+
+#=========================================
+# Median
+#=========================================
+def median ( array ):
+
+  sz = len( array )
+
+  if sz <= 0:
+    return 0
+
+  array = sorted( array )
+
+  if sz % 2 == 0:
+    n1 = array[sz//2-1]
+    n2 = array[sz//2+0]
+    return int( ceil( ( n1 + n2 ) / 2.0 ) )
+  else:
+    return array[sz//2]
+
+#=========================================
+# Get students remaining slipdays
+#=========================================
+def get_student_slipdays ( netid ):
 
   # Globals
   global student_info
@@ -785,6 +834,59 @@ def get_student_status ( netid, github_id, group ):
   global server_shutdown
 
   slipdays = student_info[netid]['slipdays']
+  if isinstance( slipdays, basestring ):
+    if slipdays.isdigit():
+      slipdays = int( slipdays )
+    else:
+      slipdays = 0
+
+  used_slipdays = 0
+
+  len_hdr = len( 'Assignment' )
+  header  = 'Assignment\tUsed slipdays'.expandtabs(10)
+
+  msg  = '\n'
+  msg += '\n' + header
+  msg += '\n' + ( '-' * len(header) )
+
+  # Slipdays
+  for a_id in assignments_info:
+    name    = assignments_info[a_id]['name'    ]
+    name    = name + ( ' ' * ( len_hdr - len( name ) ) )
+    
+    sd_list = assignments_info[a_id]['slipdays']
+    #slipdays = None
+    sd = 0
+    if netid in sd_list:
+      sd = sd_list[netid]
+
+    #if slipdays == None:
+    #  msg += '{}\t{}'
+    used_slipdays += sd
+
+    msg += '\n{}\t{}'.format( name, sd ).expandtabs(10)
+
+  slipdays -= used_slipdays
+
+  msg += '\n' + ( '-' * len(header) )
+  tmp    = 'Total'
+  tmp    = tmp + ( ' ' * ( len_hdr - len(tmp) ) )
+  msg += '\n{}\t{}'.format( tmp, used_slipdays ).expandtabs(10)
+
+  return ( msg, slipdays )
+
+#=========================================
+# Get students status
+#=========================================
+def get_student_status ( netid, github_id, group ):
+
+  # Globals
+  global student_info
+  global group_info
+  global assignments_info
+  global superusers
+  global server_started
+  global server_shutdown
 
   ret = 0
   msg = 'Your NetID is {}'.format(netid)
@@ -802,43 +904,40 @@ def get_student_status ( netid, github_id, group ):
   else:
     msg += '\nYou are NOT assigned to any group.'
 
-  used_slipdays = 0
+  sd_msg, slipdays = get_student_slipdays( netid )
 
-  # Construct a table for slipdays
-  len_hdr = len( 'Assignment' )
-  header = 'Assignment\tUsed slipdays'.expandtabs(10)
-  f_msg  = '\n'
-  f_msg += '\n' + header
-  f_msg += '\n' + ( '-' * len(header) )
-  # Slipdays
-  for a_id in assignments_info:
-    name    = assignments_info[a_id]['name'    ]
-    name    = name + ( ' ' * ( len_hdr - len( name ) ) )
-    
-    sd_list = assignments_info[a_id]['slipdays']
-    #slipdays = None
-    sd = 0
-    if netid in sd_list:
-      sd = sd_list[netid]
+  # Get slipdays for group
+  group_slipdays_lst = []
+  if group != None and group[0] == 'c':
 
-    #if slipdays == None:
-    #  msg += '{}\t{}'
-    used_slipdays += sd
+    gid = group[1]
 
-    f_msg += '\n{}\t{}'.format( name, sd ).expandtabs(10)
+    # Enumerate group members
+    for member in group_info[gid]['members']:
 
-  f_msg += '\n' + ( '-' * len(header) )
-  tmp    = 'Total'
-  tmp    = tmp + ( ' ' * ( len_hdr - len(tmp) ) )
-  f_msg += '\n{}\t{}'.format( tmp, used_slipdays).expandtabs(10)
-  # End table
+      tmp, sd = get_student_slipdays( member )
+      group_slipdays_lst.append( sd )
 
   # Slipdays
-  msg += '\n'
-  msg += '\nRemaining slipdays {}'.format( slipdays - used_slipdays )
+  msg += '\nRemaining slipdays {}'.format( slipdays )
+
+  # Group's slipdays
+  if len(group_slipdays_lst) > 0:
+
+    gid = group[1]
+
+    group_slipdays_med = median( group_slipdays_lst )
+    vmaj, group_slipdays_maj = get_majority_vote( group_slipdays_lst )
+
+    if vmaj:
+      group_slipdays = max( group_slipdays_med, group_slipdays_maj )
+    else:
+      group_slipdays = group_slipdays_med
+
+    msg += '\nGroup {} slipdays {}'.format( gid, group_slipdays )
 
   # Slipdays table
-  msg += f_msg
+  msg += sd_msg
 
   return ret, msg
 
@@ -877,6 +976,64 @@ def update_group_description ( group_id ):
   description = ', '.join( names )
 
   repo.edit( group_name, description = description )
+
+#=========================================
+# Set database field to a value
+#=========================================
+# This is highly experimental, but needed
+def set_database_field ( netid, field, value ):
+
+  # Globals
+  global student_info
+  global db_dirty
+  global sync_db
+
+  global github_obj
+  global course_org
+  global generic_team
+  global groups_teams
+
+  # Return
+  ret = -1
+  msg = ''
+
+  # None for the netid means all students
+  skipped_msg = 'Students skipped when value was set:'
+  skipped_num = 0
+  i           = 1
+  if netid == None:
+    # Go through all students
+    # For now, we don't set the value for students
+    # missing the field
+    for netid in student_info:
+
+      if field in student_info[netid]:
+        student_info[netid][field] = value
+      else:
+        skipped_msg += '\n' + '{:02} '.format(i) + netid
+        skipped_num += 1
+
+  else:
+    if field in student_info[netid]:
+      student_info[netid][field] = value
+    else:
+      skipped_msg += '\n' + '{:02} '.format(i) + netid
+      skipped_num += 1
+
+  # Construct a message
+  ret  = 0
+  msg  = "Successfully finished updating the database"
+  if skipped_num != 0:
+    msg += '\n\n' + skipped_msg
+
+  # Database is dirty
+  db_dirty = True
+
+  # Signal update thread
+  sync_db.set()
+
+  # Return
+  return ( ret, msg )
 
 #=========================================
 # Assigning a GitHub to a user
@@ -1885,6 +2042,31 @@ def execute_command( netid, cmd, args ):
       # Assignments
       elif args[0] == 'update-assignments':
         ret, msg = refresh_assignments()
+
+      # Update fields
+      # Expermintal
+      elif args[0] == 'set-all':
+        if len(args[1:]) >= 2:
+          ret, msg = set_database_field( None, args[1], args[2] )
+        else:
+          ret = -7
+          msg = 'Not enough arguments supplied for "set-database-field"'
+
+      elif args[0] == 'set':
+        if len(args[1:]) >= 3:
+          ret, msg = set_database_field( args[1], args[2], args[3] )
+        else:
+          ret = -7
+          msg = 'Not enough arguments supplied for "set-database-field"'
+
+      # Peform an action on behalf a student
+      elif args[0] == 'dofor':
+        if len(args[1:]) >= 2:
+          ret, msg = execute_command( args[1], args[2], args[3:] )
+        else:
+          ret = -7
+          msg = 'Not enough arguments supplied for "set-database-field"'
+
 
       # Not defined
       else:
