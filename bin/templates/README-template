@@ -62,7 +62,7 @@ tracker and a wiki. Both are available via links to the right of your
 main repository GitHub page or via the following direct links:
 
  * https://github.com/__COURSE_ORG__/__REPO_NAME__/issues
- * https://github.com/__COURSE_OEG__/__REPO_NAME__/wiki
+ * https://github.com/__COURSE_ORG__/__REPO_NAME__/wiki
 
 Consider using the GitHub issue tracker to track bugs you find in your
 code or to manage tasks required to complete the lab assignment. You can
