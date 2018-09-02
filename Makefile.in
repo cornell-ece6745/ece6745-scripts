@@ -12,12 +12,16 @@ install_exes = \
   $(src_dir)/bin/server_config.py \
   $(src_dir)/bin/ece4750-lab-admin \
   $(src_dir)/bin/ece4750-copy-repo \
+  $(src_dir)/bin/ece4750-init-repo \
   $(src_dir)/bin/ece4750-lab-server \
   $(src_dir)/bin/ece4750-lab-server-utils \
   $(src_dir)/bin/ece4750-travis-status \
 
 install_etcs = \
   $(src_dir)/etc/ece4750-git-config \
+
+install_templates = \
+  $(src_dir)/bin/templates/README-template \
 
 #-------------------------------------------------------------------------
 # Basic setup
@@ -66,6 +70,7 @@ endif
 
 install_exes_dir := $(DESTDIR)/bin
 install_etcs_dir := $(DESTDIR)/etc
+install_templates_dir := $(DESTDIR)/bin/templates
 
 MKINSTALLDIRS := $(scripts_dir)/mk-install-dirs.sh
 INSTALL       := @INSTALL@
@@ -94,7 +99,19 @@ install-etcs : $(install_etcs)
 	$(INSTALL_ETC) $(src_dir)/etc/ece4750-git-config \
                  $(DESTDIR)/etc/gitconfig.d
 
-install : install-exes install-etcs
+# Just deal with this install manually for now
+
+install-templates : $(install_templates)
+	$(MKINSTALLDIRS) $(DESTDIR)/bin/templates
+	$(MKINSTALLDIRS) $(DESTDIR)/bin/templates/gitconfig.d
+	$(INSTALL_ETC) $(src_dir)/etc/ece4750-git-config \
+	         $(DESTDIR)/bin/templates/gitconfig.d
+	for file in $(install_templates); \
+  do \
+    $(INSTALL_EXE) $$file $(install_templates_dir); \
+  done
+
+install : install-exes install-etcs install-templates
 ifeq ($(enable_stow),yes)
 	$(MKINSTALLDIRS) $(stow_pkg_dir)
 	cd $(stow_pkg_dir) && \
@@ -102,7 +119,7 @@ ifeq ($(enable_stow),yes)
     $(STOW) $(project_name)-$(project_ver)
 endif
 
-.PHONY : install install-exes install-etcs
+.PHONY : install install-exes install-etcs install-templates
 
 #-------------------------------------------------------------------------
 # Regenerate configure information

@@ -12,7 +12,11 @@ class server_config():
     # default to the following if nothing has been provided
     self.utils_port  = 2048
 
-    self.superusers  = [ 'ka429' ]
+    # Superusers
+    self.superusers  = [ 'ka429', 'yg397' ]
+
+    # Token for TravisCI
+    self.travis_token = 'sPjK7gKr2Tfez5Vg3KVJ'
 
   def getSU( self ):
     return self.superusers

@@ -1,0 +1,52 @@
+#!/bin/sh
+
+# Get arguments
+if [[ $# -lt 6 ]]; then
+  echo "You need five arguments to run this script"
+  echo " $0 <username> <password> <org> <repo> <group_num> <token>"
+  echo "$#"
+  exit -1
+fi
+
+username=$1
+password=$2
+org_name=$3
+repo=$4
+group_num=$5
+token=$6
+
+# Maintain stuff
+current_dir=$(cd $(dirname "${BASH_SOURCE[0]}")>/dev/null && pwd)
+
+# Remove the work directory to clean it up
+rm -rf ${current_dir}/tmp
+
+# Make a work directory
+mkdir -p ${current_dir}/tmp
+
+# Go to work directory to contain generated files
+cd ${current_dir}/tmp
+
+# Get the source
+git clone https://${username}:${password}@github.com/${org_name}/${repo}.git repo
+
+# get into the source
+cd repo
+
+# Get the template
+cat ${current_dir}/templates/README-template | sed -e "s/__COURSE_ORG__/${org_name}/g" | sed -e "s/__REPO_NAME__/${repo}/g" | sed -e "s/__GROUPNUM__/${group_num}/g" | sed -e "s/__TOKEN__/${token}/g" > README.md
+
+# do stuff!
+git add * &>/dev/null
+git commit -m "init" &>/dev/null
+git push &>/dev/null
+
+# create an upstream branch
+git checkout -b upstream &>/dev/null
+git push --set-upstream origin upstream &>/dev/null
+
+# Go back
+cd ${current_dir}
+
+# Clean up
+rm -rf ${current_dir}/tmp

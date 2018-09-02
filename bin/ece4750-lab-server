@@ -20,6 +20,7 @@ import datetime
 import signal
 import time
 import subprocess
+import requests
 
 # Database backend
 import json
@@ -35,14 +36,25 @@ from random import *
 # Math stuff
 from math import ceil
 
+# Import stuff from previous implementations
+import smtplib
+import binascii
+import logging
+
+# Configuration
+from server_config import server_config
+from global_config import global_config
+
+# GitHub stuff
+from github import Github
+from github import GithubException
+
+# Append path for import
 sys.path.append("/classes/ece4750/install/venv-pkgs/x86_64-rhel7/python2.7.12/lib/python2.7/site-packages/PyGithub-1.27.1-py2.7.egg")
 
 #-------------------------------------------------------------------------
 # Constants
 #-------------------------------------------------------------------------
-
-from server_config import server_config
-from global_config import global_config
 
 gConfigs = global_config()
 sConfigs = server_config()
@@ -180,12 +192,11 @@ assignments_info_file = database_path + 'assignments.json'
 
 executable_path       = os.path.dirname(os.path.realpath(__file__))
 
-student_info = {}
-group_info   = {}
 
-import smtplib
-import binascii
-import logging
+# Internal databases/structures
+student_info     = {}
+group_info       = {}
+assignments_info = {}
 
 #-------------------------------------------------------------------------
 # Functions to update/load databases
@@ -194,6 +205,7 @@ import logging
 def load_student_info():
 
   global student_info
+  global init_db_dirty
   
   student_info = {}
   if os.path.exists( student_info_file ):
@@ -205,6 +217,7 @@ def load_student_info():
 def load_group_info():
 
   global group_info
+  global init_db_dirty
 
   group_info = {}
   if os.path.exists( group_info_file ):
@@ -456,11 +469,6 @@ force_update    = False
 server_started  = False
 
 sync_db         = threading.Event()
-
-# GitHub stuff
-
-from github import Github
-from github import GithubException
 
 github_obj   = None
 course_org   = None
@@ -1140,6 +1148,159 @@ def assign_github_id ( netid, github_id ):
   return ( ret, msg )
 
 #=========================================
+# Initialize a README for a repo
+#=========================================
+def init_repo_readme ( repo, group_num, gh_token = None ):
+
+  # Globals
+  global github_obj
+  global sConfigs
+  global executable_path
+
+  # Create a token
+  if gh_token is None:
+    trails = 0
+    auth = None
+    while auth == None and trails < 10:
+      try:
+        key_name = 'temp_key_{:06d}'.format(randint(0, 999999))
+        auth = github_obj.get_user().create_authorization(scopes=['repo', 'user'], note='temp_key')
+        trails = trails +  1
+      except:
+        auth = None
+  else:
+    auth = gh_token
+
+  # Copy the repo
+  gh_uname = github_obj.get_user().login
+  gh_pwd   = auth.token
+  org_name = course_org.login
+  token    = sConfigs.travis_token
+
+  gh_copy = executable_path + '/ece4750-init-repo'
+  cmd     = gh_copy + ' {} {} {} {} {} {}'.format( gh_uname, gh_pwd ,
+                                                   org_name, repo   ,
+                                                   group_num, token )
+  subshell( cmd )
+
+  # Remove authorization token
+  if gh_token is None:
+    auth.delete()
+
+#=========================================
+# Travis CI stuff
+#=========================================
+
+def activate_travisCI( org, repo_name, gh_token ):
+
+  # Internally used functions
+  def wait_sync( resp ):
+
+    ret = False
+
+    if not resp:
+      ret = True
+    else:
+      resp_code = resp.status_code
+      resp      = resp.json()
+
+      if resp_code == 409 and \
+         resp['error_type'] == 'already_syncing':
+        ret = True
+
+    return ret
+
+  # Get a TravisCI token
+
+  tokenRequest = {
+    "github_token": gh_token.token
+  }
+
+  # Request for a token
+
+  resp = requests.post('https://api.travis-ci.com/auth/github',
+           data = tokenRequest
+         )
+
+  if resp.status_code != 200: return
+
+  # Get the actual token
+
+  token = json.loads(resp.text)['access_token']
+
+  # API Headers
+  requestHeaders = {
+      "User-Agent": "TravisActivate/1.0",
+      "Authorization": "token \"" + token + "\"",
+      "Accept": "application/vnd.travis-ci.2+json"
+  }
+  
+  requestHeadersV3 = {
+      "User-Agent": "TravisActivate/1.0",
+      "Content-Type": "application/json",
+      "Accept": "application/json",
+      "Travis-API-Version": "3",
+      "Authorization": "token " + token
+  }
+
+  # API Payload
+  desiredSettings = {
+      "settings": {
+          "builds_only_with_travis_yml": True,
+          "build_pushes": True,
+          "build_pull_requests": True,
+          "maximum_number_of_builds": 1
+      }
+  }
+  
+  buildRequest = {
+      "request": {
+          "branch": "master"
+      }
+  }
+
+  buildRequest = {}
+
+  # Get user ID
+  userInfo = requests.get('https://api.travis-ci.com/user', headers = requestHeadersV3)
+  userID   = userInfo.json()['id']
+
+  repo = None
+  repoID = None
+
+  while repoID is None:
+    # Cool-down
+    if repo: time.sleep(2)
+
+    # Sync user repos
+    syncPost = requests.post('https://api.travis-ci.com/user/{}/sync'.format(userID), headers = requestHeadersV3)
+
+    # Repo Slug
+    repo_slug = '{}%2F{}'.format( org, repo_name )
+
+    # Activate repo
+    repo = requests.get('https://api.travis-ci.com/repo/{}'.format(repo_slug),
+                         headers = requestHeadersV3)
+
+    if repo.status_code == 200:
+      repoID = repo.json()['id']
+
+  # Activate repo
+  requests.post('https://api.travis-ci.com/repo/{}/activate'.format(repoID),
+                headers = requestHeadersV3,
+                data = json.dumps(buildRequest))
+
+  # Set settings
+  requests.patch('https://api.travis-ci.com/repos/{}/settings'.format(repoID),
+                 headers = requestHeaders,
+                 data = json.dumps(desiredSettings))
+
+  # Request a re-build
+  requests.post('https://api.travis-ci.com/repo/{}/requests'.format(repoID),
+                headers = requestHeadersV3,
+                data = json.dumps(buildRequest))
+
+#=========================================
 # Initialize repos
 #=========================================
 def init_repos ( ):
@@ -1149,34 +1310,120 @@ def init_repos ( ):
   global student_info
   global group_info
   global db_dirty
+  global logger
 
   global github_obj
   global course_org
   global generic_team
   global groups_teams
 
+  logger.warning('--- STARTING AN INITIALIZATION PROCESS ---')
+
+  #=======================================
+  # Remove all repos and teams
+  #=======================================
+
   # Delete all repos
+  logger.warning('  * Deleting repositories:')
   for gid in xrange(1, 41):
     group_id = str(gid)
     group_name = 'lab-group{:02d}'.format( int( group_id ) )
+    logger.warning('    - {}'.format(group_name))
     try:
       repo = course_org.get_repo( group_name )
-      repo.delete()
     except:
-      pass
+      repo = None
+    if repo: repo.delete()
+    time.sleep(0.1)
+
+  # Delete all teams
+  logger.warning('  * Deleting teams:')
+  for tid in xrange(1, 41):
+    team_name = 'lab-group{:02d}'.format( tid )
+    logger.warning('    - {}'.format(team_name))
+    try:
+      team = get_team( course_org, team_name )
+    except:
+      team = None
+    if team: team.delete()
+    time.sleep(0.1)
+
+  # Remove all students
+  logger.warning('  * Removing git usernames from organization:')
+  students = generic_team.get_members()
+  for student in students:
+    if student.login != 'cbatten' and student.login != 'hawajkm':
+      logger.warning('    - {}'.format(student.login))
+
+      try:
+        course_org.remove_from_members(student)
+      except:
+        pass
+
+      try:
+        course_org.remove_from_membership(student)
+      except:
+        pass
+
+      try:
+        course_org.remove_from_public_members(student)
+      except:
+        pass
+
+    time.sleep(0.1)
+
+  #=======================================
+  # Recreate all structures
+  #=======================================
+
+  # Generate new teams
+  logger.warning('  * Creating teams:')
+  for tid in xrange(1, 41):
+    team_name = 'lab-group{:02d}'.format( tid )
+    logger.warning('    - {}'.format(team_name))
+    team = course_org.create_team( team_name )
+    team.edit( team_name, permission = 'push' )
+    time.sleep(0.1)
+
+  # Update teams
+  for tid in xrange(1, 41):
+    team_name = 'lab-group{:02d}'.format( tid )
+    groups_teams[team_name] = get_team( course_org, team_name )
+    time.sleep(0.1)
+
+  # Create an authorization token for github
+  trails = 0
+  auth = None
+  while auth == None and trails < 10:
+    trails = trails + 1
+    try:
+      key_name = 'temp_key_{:06d}'.format(randint(0, 999999))
+      auth = github_obj.get_user().create_authorization(scopes=['repo', 'user'], note=key_name)
+    except:
+      auth = None
+
+  # Hopefully we got a valid key
+  assert auth
 
   # Generate new repos
+  logger.warning('  * Creating repositories:')
   for gid in xrange(1, 41):
     group_id = str(gid)
     group_name = 'lab-group{:02d}'.format( int( group_id ) )
-    try:
-      repo = course_org.create_repo( group_name, private = True )
-      team = groups_teams[group_name]
-      team.edit( group_name, permission='push' )
-      team.add_to_repos( repo )
-      update_group_description( group_id )
-    except:
-      pass
+    logger.warning('    - {}'.format(group_name))
+    repo = course_org.create_repo( group_name, private = True )
+    team = groups_teams[group_name]
+    team.edit( group_name, permission='push' )
+    team.add_to_repos( repo )
+    update_group_description( group_id )
+    init_repo_readme( repo.name, group_id, auth )
+    #hawajkm: This is experimental; please! do not uncomment
+    #activate_travisCI( course_org.login, repo.name, auth )
+    time.sleep(0.1)
+
+  # Delete authorization token
+  if auth:
+    auth.delete()
 
   # All is well ...
   ret = 0
@@ -1316,6 +1563,7 @@ def leave_group ( netid ):
   global group_info
   global db_dirty
   global sync_db
+  global executable_path
 
   global github_obj
   global course_org
@@ -1703,6 +1951,24 @@ def approve_group ( netid, o_netid ):
 
   # Return
   return ( ret, msg )
+
+#=========================================
+# Get team object from name
+#=========================================
+def get_team( org, team_name ):
+
+  # Get all teams
+  teams = org.get_teams()
+
+  # Filter
+  q_teams = [x for x in teams if x.name == team_name]
+
+  # Do we have a match
+  team = None
+  if len(q_teams) > 0: team = q_teams[0]
+
+  # Finished
+  return team
 
 #=========================================
 # Setup the server
