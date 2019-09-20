@@ -66,6 +66,34 @@ function append_to_pathlist
 }
 
 #-------------------------------------------------------------------------
+# Make sure no other course setup script has been sourced
+#-------------------------------------------------------------------------
+# https://stackoverflow.com/questions/3601515/how-to-check-if-a-variable-is-set-in-bash
+
+if [[ ! -z "${SETUP_COURSE}" ]]; then
+  print ""
+  print " It looks like you have already sourced the setup-${SETUP_COURSE}.sh"
+  print " script, but you can only source ONE setup script at a time!"
+  print " If you did not explicitly source the setup-${SETUP_COURSE}.sh"
+  print " script, then it is probably being sourced automatically"
+  print " in your .bashrc file. Open the $HOME/.bashrc file using"
+  print " geany or your favorite text editor and remove any lines"
+  print " which source setup-${SETUP_COURSE}.sh. Then log out and log"
+  print " back into ecelinux. You will need to explicitly source the"
+  print " appropriate setup script before working on a course, and"
+  print " log out and log back in to work on a different course."
+  print ""
+  return
+fi
+
+#-------------------------------------------------------------------------
+# Set environment variable so we know this script has been sourced
+#-------------------------------------------------------------------------
+
+export SETUP_COURSE="ece4750"
+export SETUP_ECE4750="yes"
+
+#-------------------------------------------------------------------------
 # Start
 #-------------------------------------------------------------------------
 
@@ -362,11 +390,21 @@ source ${RVM_PKGS_GLOBAL_PREFIX}/scripts/rvm
 alias riscv32-objdump="riscv32-unknown-elf-objdump -dC --no-show-raw-insn -Mno-aliases -Mnumeric"
 
 #-------------------------------------------------------------------------
+# Setup Prompt
+#-------------------------------------------------------------------------
+# We used to not mess with a user's prompt, but students kept forgetting
+# to source the setup script. So now we change the prompt to make it
+# obvious that (1) they have sourced the setup scripts, and (2) what
+# directory they are currently working in.
+
+print "  - Setting up prompt"
+
+PS1="\[\e[1;34m\]ECE4750:\[\e[0m\] \[\e[1m\]\w\[\e[0m\] % "
+export PROMPT_DIRTRIM=2
+
+#-------------------------------------------------------------------------
 # Done
 #-------------------------------------------------------------------------
-# Set environment variable so we know this script has been sourced
-
-export SETUP_ECE4750="yes"
 
 if [[ "x$1" != "x-n" ]] && [[ "x$2" != "x-n" ]]; then
   print ""
