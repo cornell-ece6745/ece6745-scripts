@@ -13,7 +13,7 @@ class server_config():
     self.utils_port  = 2048
 
     # Superusers
-    self.superusers  = [ 'ka429', 'yg397' ]
+    self.superusers  = [ 'ka429', 'yg397', 'zz586']
 
     # Token for TravisCI
     self.travis_token = 'sPjK7gKr2Tfez5Vg3KVJ'
