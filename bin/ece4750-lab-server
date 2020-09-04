@@ -1419,6 +1419,15 @@ def init_repos ( ):
     init_repo_readme( repo.name, group_id, auth )
     #hawajkm: This is experimental; please! do not uncomment
     #activate_travisCI( course_org.login, repo.name, auth )
+
+    #yugan: grant 'admins', 'graders' and 'staff' the access to the repo
+    # 'admins' ID: 2499788
+    # 'graders' ID: 2515605
+    # 'staff' ID: 1699381
+    course_org.get_team( 2499788 ).add_to_repos( repo )
+    course_org.get_team( 2515605 ).add_to_repos( repo )
+    course_org.get_team( 1699381 ).add_to_repos( repo )
+
     time.sleep(0.1)
 
   # Delete authorization token
