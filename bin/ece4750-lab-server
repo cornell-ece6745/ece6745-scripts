@@ -471,6 +471,7 @@ server_started  = False
 sync_db         = threading.Event()
 
 github_obj   = None
+github_token = None
 course_org   = None
 generic_team = None
 groups_teams = None
@@ -1150,30 +1151,31 @@ def assign_github_id ( netid, github_id ):
 #=========================================
 # Initialize a README for a repo
 #=========================================
-def init_repo_readme ( repo, group_num, gh_token = None ):
+def init_repo_readme ( repo, group_num):
 
   # Globals
   global github_obj
+  global github_token
   global sConfigs
   global executable_path
 
   # Create a token
-  if gh_token is None:
-    trails = 0
-    auth = None
-    while auth == None and trails < 10:
-      try:
-        key_name = 'temp_key_{:06d}'.format(randint(0, 999999))
-        auth = github_obj.get_user().create_authorization(scopes=['repo', 'user'], note='temp_key')
-        trails = trails +  1
-      except:
-        auth = None
-  else:
-    auth = gh_token
+  # if gh_token is None:
+  #   trails = 0
+  #   auth = None
+  #   while auth == None and trails < 10:
+  #     try:
+  #       key_name = 'temp_key_{:06d}'.format(randint(0, 999999))
+  #       auth = github_obj.get_user().create_authorization(scopes=['repo', 'user'], note='temp_key')
+  #       trails = trails +  1
+  #     except:
+  #       auth = None
+  # else:
+  #   auth = gh_token
 
   # Copy the repo
   gh_uname = github_obj.get_user().login
-  gh_pwd   = auth.token
+  gh_pwd   = github_token
   org_name = course_org.login
   token    = sConfigs.travis_token
 
@@ -1184,15 +1186,15 @@ def init_repo_readme ( repo, group_num, gh_token = None ):
   subshell( cmd )
 
   # Remove authorization token
-  if gh_token is None:
-    auth.delete()
+  # if gh_token is None:
+  #   auth.delete()
 
 #=========================================
 # Travis CI stuff
 #=========================================
 
-def activate_travisCI( org, repo_name, gh_token ):
-
+def activate_travisCI( org, repo_name):
+  global github_token
   # Internally used functions
   def wait_sync( resp ):
 
@@ -1213,7 +1215,7 @@ def activate_travisCI( org, repo_name, gh_token ):
   # Get a TravisCI token
 
   tokenRequest = {
-    "github_token": gh_token.token
+    "github_token": github_token
   }
 
   # Request for a token
@@ -1392,18 +1394,18 @@ def init_repos ( ):
     time.sleep(0.1)
 
   # Create an authorization token for github
-  trails = 0
-  auth = None
-  while auth == None and trails < 10:
-    trails = trails + 1
-    try:
-      key_name = 'temp_key_{:06d}'.format(randint(0, 999999))
-      auth = github_obj.get_user().create_authorization(scopes=['repo', 'user'], note=key_name)
-    except:
-      auth = None
+  # trails = 0
+  # auth = None
+  # while auth == None and trails < 10:
+  #   trails = trails + 1
+  #   try:
+  #     key_name = 'temp_key_{:06d}'.format(randint(0, 999999))
+  #     auth = github_obj.get_user().create_authorization(scopes=['repo', 'user'], note=key_name)
+  #   except:
+  #     auth = None
 
-  # Hopefully we got a valid key
-  assert auth
+  # # Hopefully we got a valid key
+  # assert auth
 
   # Generate new repos
   logger.warning('  * Creating repositories:')
@@ -1416,11 +1418,11 @@ def init_repos ( ):
     team.edit( group_name, permission='push' )
     team.add_to_repos( repo )
     update_group_description( group_id )
-    init_repo_readme( repo.name, group_id, auth )
+    init_repo_readme( repo.name, group_id)
     #hawajkm: This is experimental; please! do not uncomment
     #activate_travisCI( course_org.login, repo.name, auth )
 
-    #yugan: grant 'admins', 'graders' and 'staff' the access to the repo
+    # yugan: grant 'admins', 'graders' and 'staff' the access to the repo
     # 'admins' ID: 2499788
     # 'graders' ID: 2515605
     # 'staff' ID: 1699381
@@ -1431,8 +1433,8 @@ def init_repos ( ):
     time.sleep(0.1)
 
   # Delete authorization token
-  if auth:
-    auth.delete()
+  # if auth:
+  #   auth.delete()
 
   # All is well ...
   ret = 0
@@ -1575,6 +1577,7 @@ def leave_group ( netid ):
   global executable_path
 
   global github_obj
+  global github_token
   global course_org
   global generic_team
   global groups_teams
@@ -1602,15 +1605,15 @@ def leave_group ( netid ):
 
       # Clone for the student
       # Create a token
-      trails = 0
-      auth = None
-      while auth == None and trails < 10:
-        try:
-          key_name = 'temp_key_{:06d}'.format(randint(0, 999999))
-          auth = github_obj.get_user().create_authorization(scopes=['repo', 'user'], note='temp_key')
-          trails = trails +  1
-        except:
-          auth = None
+      # trails = 0
+      # auth = None
+      # while auth == None and trails < 10:
+      #   trails = trails +  1
+      #   try:
+      #     key_name = 'temp_key_{:06d}'.format(randint(0, 999999))
+      #     auth = github_obj.get_user().create_authorization(scopes=['repo', 'user'], note='temp_key')
+      #   except:
+      #     auth = None
 
       # Get latest commit on the repo
       repo   = course_org.get_repo( team_name )
@@ -1626,7 +1629,7 @@ def leave_group ( netid ):
 
       # Copy the repo
       gh_uname = github_obj.get_user().login
-      gh_pwd   = auth.token
+      gh_pwd   = github_token
       org_name = course_org.login
       src_repo = team_name
       dst_repo = shadow_name
@@ -1641,7 +1644,7 @@ def leave_group ( netid ):
       shadow_repo.add_to_collaborators( github_id )
 
       # Remove authorization token
-      auth.delete()
+      # auth.delete()
 
       # Update Group
       while netid in group_info[group_id]['members']:
@@ -1991,6 +1994,7 @@ def server_setup ( username, pwd ):
   global sync_db
 
   global github_obj
+  global github_token
   global course_org
   global generic_team
   global groups_teams
@@ -2000,7 +2004,9 @@ def server_setup ( username, pwd ):
   msg = ''
 
   try:
-    tmp_github_obj = Github( username, pwd, user_agent='PyGithub' )
+    tmp_github_obj = Github( pwd, user_agent='PyGithub' )
+    tmp_github_token = pwd
+    # tmp_github_obj = Github( username, pwd, user_agent='PyGithub' )
     tmp_course_org = tmp_github_obj.get_organization( 'cornell-ece4750' )
     tmp_teams      = tmp_course_org.get_teams()
     tmp_course_org.get_members()
@@ -2011,6 +2017,7 @@ def server_setup ( username, pwd ):
 
     # Swap
     github_obj = tmp_github_obj
+    github_token = tmp_github_token
     course_org = tmp_course_org
 
     # Parse teams :)
