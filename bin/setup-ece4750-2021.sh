@@ -163,13 +163,13 @@ print "  - Determine platform: ${ARCH}"
 
 print "  - Setting up global package install paths"
 
-export STOW_PKGS_GLOBAL_ROOT="/classes/ece4750/install/stow-pkgs"
+export STOW_PKGS_GLOBAL_ROOT="/classes/ece4750/install-2021/stow-pkgs"
 export STOW_PKGS_GLOBAL_PREFIX="${STOW_PKGS_GLOBAL_ROOT}/${ARCH}"
 
-export BARE_PKGS_GLOBAL_ROOT="/classes/ece4750/install/bare-pkgs"
+export BARE_PKGS_GLOBAL_ROOT="/classes/ece4750/install-2021/bare-pkgs"
 export BARE_PKGS_GLOBAL_PREFIX="${BARE_PKGS_GLOBAL_ROOT}/${ARCH}"
 
-export RVM_PKGS_GLOBAL_ROOT="/classes/ece4750/install/rvm-pkgs"
+export RVM_PKGS_GLOBAL_ROOT="/classes/ece4750/install-2021/rvm-pkgs"
 export RVM_PKGS_GLOBAL_PREFIX="${RVM_PKGS_GLOBAL_ROOT}/${ARCH}"
 
 append_to_pathlist PATH            "${STOW_PKGS_GLOBAL_ROOT}/noarch/bin"
@@ -257,7 +257,7 @@ chmod 600 ~/.ssh/ece4750-github
 
 print "  - Setting up global Python virtualenv [PyPy-5.4.1]"
 
-export VENV_PKGS_GLOBAL_ROOT="/classes/ece4750/install/venv-pkgs/${ARCH}"
+export VENV_PKGS_GLOBAL_ROOT="/classes/ece4750/install-2021/venv-pkgs/${ARCH}"
 
 ps_temp="$PS1"
 # source ${VENV_PKGS_GLOBAL_ROOT}/python2.7.12/bin/activate

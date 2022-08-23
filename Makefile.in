@@ -4,6 +4,7 @@
 
 install_exes = \
   $(src_dir)/bin/setup-ece4750.sh \
+  $(src_dir)/bin/setup-ece4750-2021.sh \
   $(src_dir)/bin/ece4750-git-status \
   $(src_dir)/bin/ece4750-git-add \
   $(src_dir)/bin/ece4750-git-log \
@@ -15,7 +16,7 @@ install_exes = \
   $(src_dir)/bin/ece4750-init-repo \
   $(src_dir)/bin/ece4750-lab-server \
   $(src_dir)/bin/ece4750-lab-server-utils \
-  $(src_dir)/bin/ece4750-travis-status \
+  $(src_dir)/bin/riscv32-objdump \
 
 install_etcs = \
   $(src_dir)/etc/ece4750-git-config \
