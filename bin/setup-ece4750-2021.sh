@@ -6,33 +6,13 @@
 # commands once when an account is first initialized.
 
 #-------------------------------------------------------------------------
-# Do nothing if this is not an interactive shell
-#-------------------------------------------------------------------------
-
-if [[ ! $- =~ "i" ]]; then
-  return
-fi
-
-#-------------------------------------------------------------------------
 # Command line processing
 #-------------------------------------------------------------------------
 
-if [[ "x$1" == "x-v" ]] || [[ "x$2" == "x-v" ]]; then
-  quiet="no"
-else
+if [[ "x$1" == "x-q" ]] || [[ "x$2" == "x-q" ]]; then
   quiet="yes"
-fi
-
-if [[ "x$1" == "x--enable-auto-setup" ]] || [[ "x$2" == "x--enable-auto-setup" ]]; then
-  enable_auto_setup="yes"
 else
-  enable_auto_setup="no"
-fi
-
-if [[ "x$1" == "x--disable-auto-setup" ]] || [[ "x$2" == "x--disable-auto-setup" ]]; then
-  disable_auto_setup="yes"
-else
-  disable_auto_setup="no"
+  quiet="no"
 fi
 
 #-------------------------------------------------------------------------
@@ -86,57 +66,23 @@ function append_to_pathlist
 }
 
 #-------------------------------------------------------------------------
-# Make sure this script is only sourced once
-#-------------------------------------------------------------------------
-
-if [[ "x${SETUP_ECE4750}" == "xyes" ]]; then
-  print ""
-  print " It looks like you have already sourced the setup-ece4750.sh"
-  print " script, so we are not going to do any additional setup."
-  print " You should be all set. If for some reason you were trying"
-  print " to see the effect of an updated version of the setup script"
-  print " then just log out, log back into ecelinux, and source the"
-  print " setup script again."
-  print ""
-  return
-fi
-
-#-------------------------------------------------------------------------
-# Make sure ece5745 script has not been sourced
-#-------------------------------------------------------------------------
-
-if [[ "x${SETUP_ECE5745}" == "xyes" ]]; then
-  echo ""
-  echo " It looks like you have already sourced the setup-ece5745.sh"
-  echo " script, but you can only source the setup-ece5745.sh script"
-  echo " _or_ the setup-ece4750.sh script ... not both! If you did"
-  echo " not explicitly source the setup-ece5745.sh script, then it"
-  echo " is probably being sourced automatically in your .bashrc"
-  echo " file. Open the $HOME/.bashrc file using geany or your"
-  echo " favorite text editor and remove any lines which source"
-  echo " setup-ece5745.sh. Then log out and log back into ecelinux."
-  echo ""
-  return
-fi
-
-#-------------------------------------------------------------------------
 # Make sure no other course setup script has been sourced
 #-------------------------------------------------------------------------
 # https://stackoverflow.com/questions/3601515/how-to-check-if-a-variable-is-set-in-bash
 
 if [[ ! -z "${SETUP_COURSE}" ]]; then
-  echo ""
-  echo " It looks like you have already sourced the setup-${SETUP_COURSE}.sh"
-  echo " script, but you can only source ONE setup script at a time!"
-  echo " If you did not explicitly source the setup-${SETUP_COURSE}.sh"
-  echo " script, then it is probably being sourced automatically"
-  echo " in your .bashrc file. Open the $HOME/.bashrc file using"
-  echo " geany or your favorite text editor and remove any lines"
-  echo " which source setup-${SETUP_COURSE}.sh. Then log out and log"
-  echo " back into ecelinux. You will need to explicitly source the"
-  echo " appropriate setup script before working on a course, and"
-  echo " log out and log back in to work on a different course."
-  echo ""
+  print ""
+  print " It looks like you have already sourced the setup-${SETUP_COURSE}.sh"
+  print " script, but you can only source ONE setup script at a time!"
+  print " If you did not explicitly source the setup-${SETUP_COURSE}.sh"
+  print " script, then it is probably being sourced automatically"
+  print " in your .bashrc file. Open the $HOME/.bashrc file using"
+  print " geany or your favorite text editor and remove any lines"
+  print " which source setup-${SETUP_COURSE}.sh. Then log out and log"
+  print " back into ecelinux. You will need to explicitly source the"
+  print " appropriate setup script before working on a course, and"
+  print " log out and log back in to work on a different course."
+  print ""
   return
 fi
 
@@ -223,15 +169,13 @@ export STOW_PKGS_GLOBAL_PREFIX="${STOW_PKGS_GLOBAL_ROOT}/${ARCH}"
 export BARE_PKGS_GLOBAL_ROOT="/classes/ece4750/install/bare-pkgs"
 export BARE_PKGS_GLOBAL_PREFIX="${BARE_PKGS_GLOBAL_ROOT}/${ARCH}"
 
-export VENV_PKGS_GLOBAL_ROOT="/classes/ece4750/install/venv-pkgs"
-export VENV_PKGS_GLOBAL_PREFIX="${VENV_PKGS_GLOBAL_ROOT}/${ARCH}"
+export RVM_PKGS_GLOBAL_ROOT="/classes/ece4750/install/rvm-pkgs"
+export RVM_PKGS_GLOBAL_PREFIX="${RVM_PKGS_GLOBAL_ROOT}/${ARCH}"
 
 append_to_pathlist PATH            "${STOW_PKGS_GLOBAL_ROOT}/noarch/bin"
 append_to_pathlist PATH            "${STOW_PKGS_GLOBAL_PREFIX}/bin"
 append_to_pathlist PKG_CONFIG_PATH "${STOW_PKGS_GLOBAL_PREFIX}/share/pkgconfig"
 append_to_pathlist PKG_CONFIG_PATH "${STOW_PKGS_GLOBAL_PREFIX}/lib/pkgconfig"
-append_to_pathlist LD_LIBRARY_PATH "${STOW_PKGS_GLOBAL_PREFIX}/lib64"
-append_to_pathlist LD_LIBRARY_PATH "${STOW_PKGS_GLOBAL_PREFIX}/lib"
 
 #-------------------------------------------------------------------------
 # Local package install paths
@@ -242,18 +186,13 @@ print "  - Setting up local package install paths"
 export STOW_PKGS_ROOT="${HOME}/install/stow-pkgs"
 export STOW_PKGS_PREFIX="${STOW_PKGS_ROOT}/${ARCH}"
 
-export BARE_PKGS_ROOT="${HOME}/install/bare-pkgs"
-export BARE_PKGS_PREFIX="${BARE_PKGS_ROOT}/${ARCH}"
-
-export VENV_PKGS_ROOT="${HOME}/install/venv-pkgs"
-export VENV_PKGS_PREFIX="${VENV_PKGS_ROOT}/${ARCH}"
-
 append_to_pathlist PATH            "${STOW_PKGS_ROOT}/noarch/bin"
 append_to_pathlist PATH            "${STOW_PKGS_PREFIX}/bin"
 append_to_pathlist PKG_CONFIG_PATH "${STOW_PKGS_PREFIX}/share/pkgconfig"
 append_to_pathlist PKG_CONFIG_PATH "${STOW_PKGS_PREFIX}/lib/pkgconfig"
-append_to_pathlist LD_LIBRARY_PATH "${STOW_PKGS_PREFIX}/lib64"
-append_to_pathlist LD_LIBRARY_PATH "${STOW_PKGS_PREFIX}/lib"
+
+export BARE_PKGS_ROOT="${HOME}/install/bare-pkgs"
+export BARE_PKGS_PREFIX="${BARE_PKGS_ROOT}/${ARCH}"
 
 #-------------------------------------------------------------------------
 # SSH Keys
@@ -316,11 +255,16 @@ chmod 600 ~/.ssh/ece4750-github
 # environment variable since that would disable virtualenv prompts when
 # we do future activates as well.
 
-print "  - Setting up global Python virtualenv"
+print "  - Setting up global Python virtualenv [PyPy-5.4.1]"
+
+export VENV_PKGS_GLOBAL_ROOT="/classes/ece4750/install/venv-pkgs/${ARCH}"
 
 ps_temp="$PS1"
-# source ${VENV_PKGS_GLOBAL_PREFIX}/python3.7.10/bin/activate
-source ${VENV_PKGS_GLOBAL_PREFIX}/pypy3-pymtl3-7.3.3/bin/activate
+# source ${VENV_PKGS_GLOBAL_ROOT}/python2.7.12/bin/activate
+# Shunning: since Oct 16, 2016, we switch to pypy for the global venv
+
+source ${VENV_PKGS_GLOBAL_ROOT}/pypy5.4.1/bin/activate
+
 PS1="${ps_temp}"
 
 #-------------------------------------------------------------------------
@@ -343,7 +287,7 @@ PS1="${ps_temp}"
 
 unset VERILATOR_ROOT
 
-# We don't need to set PYMTL_VERILATOR_INCLUDE_DIR anymore since PyMTL
+# We don't need to set PYMTL_VERILATOR_INCLUDE_DIR anymore sincye PyMTL
 # now can find Verilator using pkg-config.
 
 #-------------------------------------------------------------------------
@@ -427,9 +371,23 @@ export EDITOR="nano"
 # Setup LaTeX
 #-------------------------------------------------------------------------
 
-# print "  - Setting up the texlive-2016 LaTeX distribution"
+print "  - Setting up the texlive-2016 LaTeX distribution"
 
-# module load texlive-2016
+module load texlive-2016
+
+#-------------------------------------------------------------------------
+# Setup Ruby
+#-------------------------------------------------------------------------
+
+print "  - Setting up global Ruby RVM environment"
+
+source ${RVM_PKGS_GLOBAL_PREFIX}/scripts/rvm
+
+#-------------------------------------------------------------------------
+# Setup Aliases
+#-------------------------------------------------------------------------
+
+alias riscv32-objdump="riscv32-unknown-elf-objdump -dC --no-show-raw-insn -Mno-aliases -Mnumeric"
 
 #-------------------------------------------------------------------------
 # Setup Prompt
@@ -443,60 +401,6 @@ print "  - Setting up prompt"
 
 PS1="\[\e[1;34m\]ECE4750:\[\e[0m\] \[\e[1m\]\w\[\e[0m\] % "
 export PROMPT_DIRTRIM=2
-
-#-------------------------------------------------------------------------
-# Setup Aliases
-#-------------------------------------------------------------------------
-
-alias riscv32-objdump="riscv32-unknown-elf-objdump -dC --no-show-raw-insn -Mno-aliases -Mnumeric"
-
-#-------------------------------------------------------------------------
-# Auto setup
-#-------------------------------------------------------------------------
-
-print "  - enable  auto setup: ${enable_auto_setup}"
-print "  - disable auto setup: ${disable_auto_setup}"
-
-if [[ "${enable_auto_setup}" == "yes" ]]; then
-
-  print "  - removing line to source setup script from .bashrc"
-
-  rm -rf ${HOME}/.bashrc.bak
-  sed -i.bak -e '/# ECE4750 BEGIN SETUP/,/# ECE4750 END SETUP/d' ${HOME}/.bashrc
-
-  print "  - adding line to source setup script to .bashrc"
-  echo "# ECE4750 BEGIN SETUP"                     >> ${HOME}/.bashrc
-  echo ""                                          >> ${HOME}/.bashrc
-  echo "source /classes/setup/setup-ece4750.sh -q" >> ${HOME}/.bashrc
-  echo ""                                          >> ${HOME}/.bashrc
-  echo "# ECE4750 END SETUP"                       >> ${HOME}/.bashrc
-
-  echo ""
-  echo " NOTE: Your login script has been updated so that it will"
-  echo " automatically source the setup script every time you log"
-  echo " ecelinux. You can disable this behavior with this command:"
-  echo ""
-  echo "  % source setup-ece4750.sh --disable-auto-setup"
-  echo ""
-  echo " After disabling auto setup you will need manually source"
-  echo " the setup script every time you want to work on the course"
-
-fi
-
-if [[ "${disable_auto_setup}" == "yes" ]]; then
-
-  print "  - removing line to source setup script from .bashrc"
-
-  rm -rf ${HOME}/.bashrc.bak
-  sed -i.bak -e '/# ECE4750 BEGIN SETUP/,/# ECE4750 END SETUP/d' ${HOME}/.bashrc
-
-  echo ""
-  echo " NOTE: Your login script has been updated so that it will"
-  echo " no longer automatically source the setup script every time"
-  echo " you log into ecelinux.  You will need manually source"
-  echo " the setup script every time you want to work on the course"
-
-fi
 
 #-------------------------------------------------------------------------
 # Done
