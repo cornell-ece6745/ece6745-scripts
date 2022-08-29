@@ -176,6 +176,7 @@ def subshell( cmd ):
 sep                   = os.path.sep
 executable_path       = os.path.dirname(os.path.realpath(__file__))
 base_path             = os.path.realpath(executable_path + sep + '..' + sep + '..') + sep
+base_path             = '/classes/ece4750/staff/'
 
 database_path         = base_path     + 'database/'
 assignments_path      = database_path + 'assignments/'
