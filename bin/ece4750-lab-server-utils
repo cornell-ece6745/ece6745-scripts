@@ -198,7 +198,7 @@ def subshell( cmd ):
 
   del process
 
-  return stdout
+  return stdout.decode()
 
 #-------------------------------------------------------------------------
 # Main servicing logic
