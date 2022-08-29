@@ -172,7 +172,10 @@ def subshell( cmd ):
 # Paths
 #-------------------------------------------------------------------------
 
-base_path             = '/classes/ece4750/staff/'
+# hawajkm: Let's do relative path
+sep                   = os.path.sep
+executable_path       = os.path.dirname(os.path.realpath(__file__))
+base_path             = os.path.realpath(executable_path + sep + '..' + sep + '..') + sep
 
 database_path         = base_path     + 'database/'
 assignments_path      = database_path + 'assignments/'
@@ -324,7 +327,7 @@ def write_student_info():
 
     csvw.writerow( ['netid', 'name', 'github_id', 'group', 'slipdays'] )
 
-    for stu, stu_entry in student_info.iteritems():
+    for stu, stu_entry in student_info.items():
       csvw.writerow([ stu,
                       stu_entry['name'],
                       stu_entry['github_id'],
