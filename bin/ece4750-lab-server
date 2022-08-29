@@ -319,7 +319,7 @@ def write_student_info():
     json.dump( student_info, fp, indent=4 )
 
   # write student-info.csv
-  with open( student_csv_file, 'wb+' ) as fp:
+  with open( student_csv_file, 'wt+' ) as fp:
     csvw = csv.writer( fp )
 
     csvw.writerow( ['netid', 'name', 'github_id', 'group', 'slipdays'] )
@@ -364,7 +364,7 @@ def write_group_info():
     json.dump( group_info, fp, indent=4 )
 
   # write group-info.csv
-  with open( group_csv_file, 'wb+' ) as fp:
+  with open( group_csv_file, 'wt+' ) as fp:
     csvw = csv.writer( fp )
 
     csvw.writerow( ['Group Number', 'Member 1', 'Member 2', 'Member 3', 'Member 4'] )
