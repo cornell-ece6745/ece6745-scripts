@@ -49,9 +49,6 @@ from global_config import global_config
 from github import Github
 from github import GithubException
 
-# Append path for import
-sys.path.append("/classes/ece4750/install/venv-pkgs/x86_64-rhel7/python2.7.12/lib/python2.7/site-packages/PyGithub-1.27.1-py2.7.egg")
-
 #-------------------------------------------------------------------------
 # Constants
 #-------------------------------------------------------------------------
