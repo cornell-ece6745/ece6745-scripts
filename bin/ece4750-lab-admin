@@ -87,7 +87,7 @@ def send_data ( sock, data, drastic = True ):
   try:
     sock.sendall( new_data )
   except:
-    print 'ERROR: cannot send data'
+    print('ERROR: cannot send data')
     if drastic:
       sock.close()
       quit ( -1 )
@@ -123,7 +123,7 @@ sock = None
 try:
   sock = socket.create_connection(( gConfigs.server_addr, gConfigs.server_port ))
 except:
-  print 'ERROR: cannot connect to server'
+  print('ERROR: cannot connect to server')
   quit ( -1 )
 
 #-------------------------------------------------------------------------
@@ -184,10 +184,10 @@ if opts.server:
     args = '\n'.join( opts.server[1:] )
 
   if cmd == 'setup':
-    print ''
+    print('')
     username = raw_input      ('  Username : ')
     pwd      = getpass.getpass('  Password : ')
-    print ''
+    print('')
 
     # Arguments
     args = '{}\n{}'.format( username, pwd )
@@ -236,10 +236,10 @@ ret     = code
 message = '\n'.join(response[1:])
 
 if ret != 0:
-  print 'ERROR executing the specified command (code {})'.format( ret )
-  print ''
+  print('ERROR executing the specified command (code {})'.format( ret ))
+  print('')
 
-print '{}'.format( message )
-print ''
+print('{}'.format( message ))
+print('')
 
 quit ( ret )

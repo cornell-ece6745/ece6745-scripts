@@ -86,7 +86,7 @@ class Logger(object):
     output_str = '[{}][{}] {} {}'.format( ts_str, t, level_name, msg )
 
     if s.printOutput:
-      print output_str
+      print(output_str)
 
     if s.outputFile:
       s.outputFile.write( output_str )
@@ -110,7 +110,7 @@ def sigint_handler (signal_num, frame):
   global server_shutdown
   global logger
 
-  print ''
+  print('')
 
   logger.warning( 'Recieved signal ({}) ...'.format( signal_num ) )
   logger.info( 'Server shutting down gracefully' )
@@ -158,7 +158,7 @@ def send_data ( sock, data, drastic = True ):
   try:
     sock.sendall( new_data )
   except:
-    print 'ERROR: cannot send data'
+    print('ERROR: cannot send data')
     if drastic:
       sock.close()
       quit ( -1 )
@@ -270,7 +270,7 @@ try:
   sock.listen(5)
 
 except:
-  print 'ERROR: Cannot bind/listen to assigned port'
+  print('ERROR: Cannot bind/listen to assigned port')
   quit( -1 )
 
 #-------------------------------------------------------------------------
