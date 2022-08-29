@@ -85,7 +85,7 @@ def send_data ( sock, data, drastic = True ):
 
   # Send the packet
   try:
-    sock.sendall( new_data )
+    sock.sendall( new_data.encode() )
   except:
     print('ERROR: cannot send data')
     if drastic:
@@ -101,9 +101,9 @@ def recv_data ( sock, drastic = False ):
 
   try:
     # Get packet length
-    tmp = sock.recv( 4 )
+    tmp = sock.recv( 4 ).decode()
     length = int( tmp )
-    data = sock.recv( length )
+    data = sock.recv( length ).decode()
   except:
     if drastic:
       sock.close()
