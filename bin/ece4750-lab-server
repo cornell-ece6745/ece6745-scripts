@@ -174,9 +174,12 @@ def subshell( cmd ):
 
 # hawajkm: Let's do relative path
 sep                   = os.path.sep
-executable_path       = os.path.dirname(os.path.realpath(__file__))
-base_path             = os.path.realpath(executable_path + sep + '..' + sep + '..') + sep
+executable_path       = os.path.dirname(os.path.realpath(__file__)) + sep
 base_path             = '/classes/ece4750/staff/'
+
+if not os.path.exists(base_path):
+  two_dir_up = '..' + sep + '..'
+  base_path = os.path.realpath(executable_path + two_dir_up) + sep
 
 database_path         = base_path     + 'database/'
 assignments_path      = database_path + 'assignments/'
