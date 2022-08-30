@@ -185,12 +185,19 @@ if opts.server:
 
   if cmd == 'setup':
     print('')
-    username = input          ('  Username : ')
-    pwd      = getpass.getpass('  Password : ')
+    print('  For Github.com, username/password logins through the\n' + \
+          '  API is no longer supported. Please, generate and use\n' + \
+          '  a personal access token.')
+    print('')
+    print('  Link: https://docs.github.com/en/authentication/keeping' + \
+          '-your-account-and-data-secure/creating-a-personal-access-' + \
+          'token')
+    print('')
+    pwd_token = getpass.getpass('  Access Token : ')
     print('')
 
     # Arguments
-    args = '{}\n{}'.format( username, pwd )
+    args = '{}'.format( pwd_token )
 
   # Send request
   req = 'server\n{}\n{}'.format( cmd, args )

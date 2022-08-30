@@ -1986,7 +1986,7 @@ def get_team( org, team_name ):
 #=========================================
 # Setup the server
 #=========================================
-def server_setup ( username, pwd ):
+def server_setup ( pwd_token, username ):
 
   # Globals
   global reset_db
@@ -2006,7 +2006,10 @@ def server_setup ( username, pwd ):
   tmp_github_obj = None
 
   try:
-    tmp_github_obj = Github( username, pwd, user_agent='PyGithub' )
+    if username is not None:
+      tmp_github_obj = Github( username, pwd_token, user_agent='PyGithub' )
+    else:
+      tmp_github_obj = Github( pwd_token, user_agent='PyGithub' )
   except GithubException as e:
     ret = -64
     msg = 'GitHub could NOT connect properly.' + \
@@ -2046,7 +2049,7 @@ def server_setup ( username, pwd ):
 
 
     except GithubException as e:
-      ret = -64
+      ret = -65
       msg = 'GitHub could NOT connect properly.\n' + \
             'No sufficient permissions.\n'
 
@@ -2264,8 +2267,10 @@ def execute_command( netid, cmd, args ):
 
       # Setup the server
       elif args[0] == 'setup':
-        if len(args[1:]) >= 2:
-          ret, msg = server_setup( args[1], args[2] )
+        if   len(args[1:]) >= 2:
+          ret, msg = server_setup( args[2], args[1] )
+        elif len(args[1:]) >= 1:
+          ret, msg = server_setup( args[1], None    )
         else:
           ret = -7
           msg = 'Not enough arguments supplied for "server setup"'
