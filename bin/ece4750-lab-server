@@ -2003,42 +2003,52 @@ def server_setup ( username, pwd ):
   ret = -1
   msg = ''
 
+  tmp_github_obj = None
+
   try:
     tmp_github_obj = Github( username, pwd, user_agent='PyGithub' )
-    tmp_course_org = tmp_github_obj.get_organization( 'cornell-ece4750' )
-    tmp_teams      = tmp_course_org.get_teams()
-    tmp_course_org.get_members()
-
-    # WORKED
-    ret = 0
-    msg = 'Server was successfully started and properly setup.'
-
-    # Swap
-    github_obj = tmp_github_obj
-    course_org = tmp_course_org
-
-    # Parse teams :)
-    groups_teams = {}
-    for team in tmp_teams:
-      if   team.name      == 'students':
-        generic_team = team
-      elif team.name[0:9] == 'lab-group':
-        groups_teams[team.name] = team
-
-    # :)
-    server_started = True
-    if update_db:
-      # If an update is pending
-      db_dirty = True
-
-      # Signal update thread
-      sync_db.set()
-
-
   except GithubException as e:
     ret = -64
-    msg =  'GitHub could NOT connect properly.' + \
-         '\nCheck the provided username/password as well as premissions.'
+    msg = 'GitHub could NOT connect properly.' + \
+          '\nCheck the provided username/password.\n'
+
+  if tmp_github_obj is not None:
+
+    try:
+      tmp_course_org = tmp_github_obj.get_organization( 'cornell-ece4750' )
+      tmp_teams      = tmp_course_org.get_teams()
+      tmp_course_org.get_members()
+
+      # WORKED
+      ret = 0
+      msg = 'Server was successfully started and properly setup.'
+
+      # Swap
+      github_obj = tmp_github_obj
+      course_org = tmp_course_org
+
+      # Parse teams :)
+      groups_teams = {}
+      for team in tmp_teams:
+        if   team.name      == 'students':
+          generic_team = team
+        elif team.name[0:9] == 'lab-group':
+          groups_teams[team.name] = team
+
+      # :)
+      server_started = True
+      if update_db:
+        # If an update is pending
+        db_dirty = True
+
+        # Signal update thread
+        sync_db.set()
+
+
+    except GithubException as e:
+      ret = -64
+      msg = 'GitHub could NOT connect properly.\n' + \
+            'No sufficient permissions.\n'
 
   # Finish
   return ( ret, msg )
