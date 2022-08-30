@@ -185,7 +185,7 @@ if opts.server:
 
   if cmd == 'setup':
     print('')
-    username = raw_input      ('  Username : ')
+    username = input          ('  Username : ')
     pwd      = getpass.getpass('  Password : ')
     print('')
 
