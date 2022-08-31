@@ -1180,7 +1180,6 @@ def init_repo_readme ( repo, group_num, gh_token ):
   global github_obj
   global sConfigs
   global executable_path
-  global
 
   # Copy the repo
   gh_uname = github_obj.get_user().login
