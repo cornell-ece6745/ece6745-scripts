@@ -329,12 +329,12 @@ def find_empty_group( status ):
   global group_info
 
   if status == 'g':
-    for gid in [ str(x) for x in xrange(1, 41) ]:
+    for gid in [ str(x) for x in range(1, 41) ]:
       if (not gid in group_info.keys()) or (len(group_info[gid]['members']) == 0):
         return gid
 
   if status == 'a':
-    for gid in [ 'a{}'.format(x) for x in xrange(1, 41) ]:
+    for gid in [ 'a{}'.format(x) for x in range(1, 41) ]:
       if (not gid in group_info.keys()) or (len(group_info[gid]['members']) == 0):
         return gid
 
@@ -1349,7 +1349,7 @@ def init_repos ( ):
 
   # Delete all repos
   logger.warning('  * Deleting repositories:')
-  for gid in xrange(1, 41):
+  for gid in range(1, 41):
     group_id = str(gid)
     group_name = 'lab-group{:02d}'.format( int( group_id ) )
     logger.warning('    - {}'.format(group_name))
@@ -1362,7 +1362,7 @@ def init_repos ( ):
 
   # Delete all teams
   logger.warning('  * Deleting teams:')
-  for tid in xrange(1, 41):
+  for tid in range(1, 41):
     team_name = 'lab-group{:02d}'.format( tid )
     logger.warning('    - {}'.format(team_name))
     try:
@@ -1402,7 +1402,7 @@ def init_repos ( ):
 
   # Generate new teams
   logger.warning('  * Creating teams:')
-  for tid in xrange(1, 41):
+  for tid in range(1, 41):
     team_name = 'lab-group{:02d}'.format( tid )
     logger.warning('    - {}'.format(team_name))
     team = course_org.create_team( team_name )
@@ -1410,7 +1410,7 @@ def init_repos ( ):
     time.sleep(0.1)
 
   # Update teams
-  for tid in xrange(1, 41):
+  for tid in range(1, 41):
     team_name = 'lab-group{:02d}'.format( tid )
     groups_teams[team_name] = get_team( course_org, team_name )
     time.sleep(0.1)
@@ -1431,7 +1431,7 @@ def init_repos ( ):
 
   # Generate new repos
   logger.warning('  * Creating repositories:')
-  for gid in xrange(1, 41):
+  for gid in range(1, 41):
     group_id = str(gid)
     group_name = 'lab-group{:02d}'.format( int( group_id ) )
     logger.warning('    - {}'.format(group_name))
@@ -2135,7 +2135,7 @@ def get_students_dict ( succinct=False ):
   students      = student_info.keys()
 
   i = 0
-  for i in xrange( len( students ) ):
+  for i in range( len( students ) ):
 
     students_dict[i] = students[i]
 
