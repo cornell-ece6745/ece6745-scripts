@@ -497,6 +497,9 @@ sync_db         = threading.Event()
 github_obj   = None
 course_org   = None
 generic_team = None
+admins_team  = None
+graders_team = None
+staff_team   = None
 groups_teams = None
 
 #-------------------------------------------------------------------------
@@ -986,6 +989,9 @@ def update_group_description ( group_id ):
   global github_obj
   global course_org
   global generic_team
+  global admins_team
+  global graders_team
+  global staff_team
   global groups_teams
 
   # Get GitHub team
@@ -1023,6 +1029,9 @@ def set_database_field ( netid, field, value ):
   global github_obj
   global course_org
   global generic_team
+  global admins_team
+  global graders_team
+  global staff_team
   global groups_teams
 
   # Return
@@ -1080,6 +1089,9 @@ def assign_github_id ( netid, github_id ):
   global github_obj
   global course_org
   global generic_team
+  global admins_team
+  global graders_team
+  global staff_team
   global groups_teams
 
   # Return
@@ -1325,6 +1337,9 @@ def init_repos ( ):
   global github_obj
   global course_org
   global generic_team
+  global admins_team
+  global graders_team
+  global staff_team
   global groups_teams
 
   logger.warning('--- STARTING AN INITIALIZATION PROCESS ---')
@@ -1388,30 +1403,22 @@ def init_repos ( ):
 
   # Generate new teams
   logger.warning('  * Creating teams:')
+  username = github_obj.get_user().login
+  creating_user = github_obj.get_user(username)
   for tid in range(1, 41):
     team_name = 'lab-group{:02d}'.format( tid )
     logger.warning('    - {}'.format(team_name))
     team = course_org.create_team( team_name )
-    team.edit( team_name, permission = 'push' )
-    time.sleep(0.1)
-
-  # Update teams
-  for tid in range(1, 41):
-    team_name = 'lab-group{:02d}'.format( tid )
-    groups_teams[team_name] = get_team( course_org, team_name )
+    team.remove_from_members( creating_user )
+    groups_teams[team_name] = team
     time.sleep(0.1)
 
   # Retrieve token
   auth = None
 
-  cred_file = config_path + 'github_creds.json'
-  if os.path.exists( cred_file ):
-    creds = None
-    with open( cred_file, 'rt' ) as fp:
-      creds = json.load(fp)
-
-    if creds is not None:
-      auth = creds['pwd_token']
+  creds = get_saved_creds()
+  if creds is not None:
+    auth = creds['pwd_token']
 
   # Generate new repos
   logger.warning('  * Creating repositories:')
@@ -1419,28 +1426,31 @@ def init_repos ( ):
     group_id = str(gid)
     group_name = 'lab-group{:02d}'.format( int( group_id ) )
     logger.warning('    - {}'.format(group_name))
+
+    # Create repo
     repo = course_org.create_repo( group_name, private = True )
+
+    # Add admins/graders/staff
+    #admins_team.add_to_repos( repo )
+    admins_team.update_team_repository( repo, permission = 'push' )
+
+    #graders_team.add_to_repos( repo )
+    graders_team.update_team_repository( repo, permission = 'push' )
+
+    #staff_team.add_to_repos( repo )
+    staff_team.update_team_repository( repo, permission = 'push' )
+
+    # Add team
     team = groups_teams[group_name]
-    team.edit( group_name, permission='push' )
-    team.add_to_repos( repo )
+    #team.edit( group_name, permission='push' )
+    #team.add_to_repos( repo )
+    team.update_team_repository( repo, permission = 'push' )
     update_group_description( group_id )
     init_repo_readme( repo.name, group_id, auth )
     #hawajkm: This is experimental; please! do not uncomment
     #activate_travisCI( course_org.login, repo.name, auth )
 
-    #yugan: grant 'admins', 'graders' and 'staff' the access to the repo
-    # 'admins' ID: 2499788
-    # 'graders' ID: 2515605
-    # 'staff' ID: 1699381
-    course_org.get_team( 2499788 ).add_to_repos( repo )
-    course_org.get_team( 2515605 ).add_to_repos( repo )
-    course_org.get_team( 1699381 ).add_to_repos( repo )
-
-    time.sleep(0.1)
-
-  # Delete authorization token
-  if auth:
-    auth.delete()
+    time.sleep(0.5)
 
   # All is well ...
   ret = 0
@@ -1463,6 +1473,9 @@ def create_group ( netid ):
   global github_obj
   global course_org
   global generic_team
+  global admins_team
+  global graders_team
+  global staff_team
   global groups_teams
 
   # Return message and code
@@ -1585,6 +1598,9 @@ def leave_group ( netid ):
   global github_obj
   global course_org
   global generic_team
+  global admins_team
+  global graders_team
+  global staff_team
   global groups_teams
 
   # Return message and code
@@ -1609,16 +1625,12 @@ def leave_group ( netid ):
       team.remove_from_members( github_id )
 
       # Clone for the student
-      # Create a token
-      trails = 0
+      # Get authentication
       auth = None
-      while auth == None and trails < 10:
-        try:
-          key_name = 'temp_key_{:06d}'.format(randint(0, 999999))
-          auth = github_obj.get_user().create_authorization(scopes=['repo', 'user'], note='temp_key')
-          trails = trails +  1
-        except:
-          auth = None
+
+      creds = get_saved_creds()
+      if creds is not None:
+        auth = creds['pwd_token']
 
       # Get latest commit on the repo
       repo   = course_org.get_repo( team_name )
@@ -1634,7 +1646,7 @@ def leave_group ( netid ):
 
       # Copy the repo
       gh_uname = github_obj.get_user().login
-      gh_pwd   = auth.token
+      gh_pwd   = auth
       org_name = course_org.login
       src_repo = team_name
       dst_repo = shadow_name
@@ -1722,6 +1734,9 @@ def join_group ( netid, group_id ):
   global github_obj
   global course_org
   global generic_team
+  global admins_team
+  global graders_team
+  global staff_team
   global groups_teams
 
   # Return message and code
@@ -1799,6 +1814,9 @@ def pending_group ( netid ):
   global github_obj
   global course_org
   global generic_team
+  global admins_team
+  global graders_team
+  global staff_team
   global groups_teams
 
   # Return message and code
@@ -1861,6 +1879,9 @@ def approve_group ( netid, o_netid ):
   global github_obj
   global course_org
   global generic_team
+  global admins_team
+  global graders_team
+  global staff_team
   global groups_teams
 
   # Return message and code
@@ -2027,6 +2048,9 @@ def server_setup ( pwd_token, username, save_creds = True ):
   global github_obj
   global course_org
   global generic_team
+  global admins_team
+  global graders_team
+  global staff_team
   global groups_teams
 
   global logger
@@ -2072,8 +2096,16 @@ def server_setup ( pwd_token, username, save_creds = True ):
       for team in tmp_teams:
         if   team.name      == 'students':
           generic_team = team
+        elif team.name      == 'admins':
+          admins_team = team
+        elif team.name      == 'staff':
+          staff_team = team
+        elif team.name      == 'graders':
+          graders_team = team
         elif team.name[0:9] == 'lab-group':
           groups_teams[team.name] = team
+        else:
+          logger.warn( 'Cannot assign team "{}"'.format(team.name) )
 
       # Check username
       gh_username = github_obj.get_user().login
@@ -2557,6 +2589,20 @@ def service_request( client, conn_point ):
   client.close()
 
 #-------------------------------------------------------------------------
+# Get credentials
+#-------------------------------------------------------------------------
+def get_saved_creds():
+  creds = None
+
+  cred_file = config_path + 'github_creds.json'
+  if os.path.exists( cred_file ):
+    creds = None
+    with open( cred_file, 'rt' ) as fp:
+      creds = json.load(fp)
+
+  return creds
+
+#-------------------------------------------------------------------------
 # Initialize the Server
 #-------------------------------------------------------------------------
 def server_init():
@@ -2565,24 +2611,20 @@ def server_init():
   global logger
 
   # Only thing we do for now is retrieve github credentials
-  # 1. Check if cred file exists
-  cred_file = config_path + 'github_creds.json'
-  if os.path.exists( cred_file ):
-    creds = None
-    with open( cred_file, 'rt' ) as fp:
-      creds = json.load(fp)
+  creds = get_saved_creds()
 
-    if creds is not None:
-      logger.info( 'Retrieving saved Github credentials' )
-      logger.info( 'Credentials file: {}'.format(cred_file) )
+  if creds is not None:
+    cred_file = config_path + 'github_creds.json'
+    logger.info( 'Retrieving saved Github credentials' )
+    logger.info( 'Credentials file: {}'.format(cred_file) )
 
-      # Add saving flag
-      creds['save_creds'] = False
-      username  = creds['username' ]
-      pwd_token = creds['pwd_token']
+    # Add saving flag
+    creds['save_creds'] = False
+    username  = creds['username' ]
+    pwd_token = creds['pwd_token']
 
-      # hawajkm: meh ... Clever but not straighforward.
-      server_setup(**creds)
+    # hawajkm: meh ... Clever but not straighforward.
+    server_setup(**creds)
 
 #-------------------------------------------------------------------------
 # Handle termination signal
