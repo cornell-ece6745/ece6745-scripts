@@ -1174,30 +1174,17 @@ def assign_github_id ( netid, github_id ):
 #=========================================
 # Initialize a README for a repo
 #=========================================
-def init_repo_readme ( repo, group_num, gh_token = None ):
+def init_repo_readme ( repo, group_num, gh_token ):
 
   # Globals
   global github_obj
   global sConfigs
   global executable_path
-
-  # Create a token
-  if gh_token is None:
-    trails = 0
-    auth = None
-    while auth == None and trails < 10:
-      try:
-        key_name = 'temp_key_{:06d}'.format(randint(0, 999999))
-        auth = github_obj.get_user().create_authorization(scopes=['repo', 'user'], note='temp_key')
-        trails = trails +  1
-      except:
-        auth = None
-  else:
-    auth = gh_token
+  global
 
   # Copy the repo
   gh_uname = github_obj.get_user().login
-  gh_pwd   = auth.token
+  gh_pwd   = gh_token
   org_name = course_org.login
   token    = sConfigs.travis_token
 
@@ -1415,19 +1402,17 @@ def init_repos ( ):
     groups_teams[team_name] = get_team( course_org, team_name )
     time.sleep(0.1)
 
-  # Create an authorization token for github
-  trails = 0
+  # Retrieve token
   auth = None
-  while auth == None and trails < 10:
-    trails = trails + 1
-    try:
-      key_name = 'temp_key_{:06d}'.format(randint(0, 999999))
-      auth = github_obj.get_user().create_authorization(scopes=['repo', 'user'], note=key_name)
-    except:
-      auth = None
 
-  # Hopefully we got a valid key
-  assert auth
+  cred_file = config_path + 'github_creds.json'
+  if os.path.exists( cred_file ):
+    creds = None
+    with open( cred_file, 'rt' ) as fp:
+      creds = json.load(fp)
+
+    if creds is not None:
+      auth = creds['pwd_token']
 
   # Generate new repos
   logger.warning('  * Creating repositories:')
