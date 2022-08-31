@@ -2060,10 +2060,13 @@ def server_setup ( pwd_token, username, save_creds = True ):
     else:
       logger.info( 'Logging into Github using access token' )
       tmp_github_obj = Github( pwd_token, user_agent='PyGithub' )
+    # Check our login is correct
+    tmp_github_obj.get_user().login
   except GithubException as e:
     ret = -64
     msg = 'GitHub could NOT connect properly.' + \
           '\nCheck the provided username/password.\n'
+    tmp_github_obj = None
 
   if tmp_github_obj is not None:
 
@@ -2596,7 +2599,6 @@ def server_init():
 
       # hawajkm: meh ... Clever but not straighforward.
       server_setup(**creds)
-      #server_setup(pwd_token = pwd_token, username = username)
 
 #-------------------------------------------------------------------------
 # Handle termination signal
@@ -2618,7 +2620,6 @@ def sigint_handler (signal_num, frame):
   # Signal update thread
   sync_db.set()
 
- 
 signal.signal(signal.SIGINT , sigint_handler)
 signal.signal(signal.SIGTERM, sigint_handler)
 
