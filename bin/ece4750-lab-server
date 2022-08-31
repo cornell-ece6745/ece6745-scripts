@@ -15,6 +15,7 @@ import argparse
 
 # System stuff
 import sys
+import stat
 import os
 import datetime
 import signal
@@ -176,13 +177,14 @@ def subshell( cmd ):
 sep                   = os.path.sep
 executable_path       = os.path.dirname(os.path.realpath(__file__)) + sep
 base_path             = '/classes/ece4750/staff/'
+home_path             = os.path.realpath(os.path.expanduser('~')) + sep
 
 if not os.path.exists(base_path):
   two_dir_up = '..' + sep + '..'
   base_path = os.path.realpath(executable_path + two_dir_up) + sep
 
-database_path         = base_path     + 'database/'
-assignments_path      = database_path + 'assignments/'
+database_path         = base_path     + 'database'          + sep
+assignments_path      = database_path + 'assignments'       + sep
 
 class_roster_file     = database_path + 'class_roster.csv'
 
@@ -194,8 +196,26 @@ group_csv_file        = database_path + 'group-info.csv'
 
 assignments_info_file = database_path + 'assignments.json'
 
-executable_path       = os.path.dirname(os.path.realpath(__file__))
+config_path           = home_path     + '.ece4750_server'   + sep
 
+# Default Private Permission
+default_DP            = stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC
+default_FP            = stat.S_IREAD | stat.S_IWRITE
+
+# Make sure directories are sane and existing
+## Configuration can be created is not existing
+if not os.path.exists( config_path ):
+  os.mkdir( config_path )
+  os.chmod( config_path, default_DP )
+
+if not os.path.exists( database_path ):
+  print('')
+  print('  ERROR: cannot access database directory')
+  print('')
+  print('  Database Directory: {}'.format( database_path ))
+  print('')
+
+  exit(-15)
 
 # Internal databases/structures
 student_info     = {}
@@ -1984,9 +2004,35 @@ def get_team( org, team_name ):
   return team
 
 #=========================================
+# Save Github.com Credentials
+#=========================================
+def save_github_credentials( pwd_token, username ):
+
+  # Globals
+  global logger
+  global config_path
+
+  # Save the credentials to configuration directory
+  cred_file = config_path + 'github_creds.json'
+
+  creds = {}
+  creds['username' ] = username
+  creds['pwd_token'] = pwd_token
+
+  # Save them
+  creds_obj = json.dumps( creds, indent = 4 )
+  with open( cred_file, 'wt' ) as fp:
+    fp.write(creds_obj)
+    logger.info( 'Saving Github credentials' )
+    logger.info( 'Credentials file: {}'.format(cred_file) )
+
+  # Fix permissions
+  os.chmod( cred_file, default_FP )
+
+#=========================================
 # Setup the server
 #=========================================
-def server_setup ( pwd_token, username ):
+def server_setup ( pwd_token, username, save_creds = True ):
 
   # Globals
   global reset_db
@@ -1999,6 +2045,8 @@ def server_setup ( pwd_token, username ):
   global generic_team
   global groups_teams
 
+  global logger
+
   # Return
   ret = -1
   msg = ''
@@ -2007,8 +2055,10 @@ def server_setup ( pwd_token, username ):
 
   try:
     if username is not None:
+      logger.info( 'Logging into Github using username/password' )
       tmp_github_obj = Github( username, pwd_token, user_agent='PyGithub' )
     else:
+      logger.info( 'Logging into Github using access token' )
       tmp_github_obj = Github( pwd_token, user_agent='PyGithub' )
   except GithubException as e:
     ret = -64
@@ -2038,6 +2088,12 @@ def server_setup ( pwd_token, username ):
         elif team.name[0:9] == 'lab-group':
           groups_teams[team.name] = team
 
+      # Check username
+      gh_username = github_obj.get_user().login
+
+      logger.info( 'Server successfully setup to use ' + \
+                   'username "{}" in Github'.format(gh_username) )
+
       # :)
       server_started = True
       if update_db:
@@ -2047,6 +2103,9 @@ def server_setup ( pwd_token, username ):
         # Signal update thread
         sync_db.set()
 
+      if save_creds:
+        # Save credentials
+        save_github_credentials( pwd_token, username )
 
     except GithubException as e:
       ret = -65
@@ -2511,6 +2570,35 @@ def service_request( client, conn_point ):
   client.close()
 
 #-------------------------------------------------------------------------
+# Initialize the Server
+#-------------------------------------------------------------------------
+def server_init():
+
+  global config_path
+  global logger
+
+  # Only thing we do for now is retrieve github credentials
+  # 1. Check if cred file exists
+  cred_file = config_path + 'github_creds.json'
+  if os.path.exists( cred_file ):
+    creds = None
+    with open( cred_file, 'rt' ) as fp:
+      creds = json.load(fp)
+
+    if creds is not None:
+      logger.info( 'Retrieving saved Github credentials' )
+      logger.info( 'Credentials file: {}'.format(cred_file) )
+
+      # Add saving flag
+      creds['save_creds'] = False
+      username  = creds['username' ]
+      pwd_token = creds['pwd_token']
+
+      # hawajkm: meh ... Clever but not straighforward.
+      server_setup(**creds)
+      #server_setup(pwd_token = pwd_token, username = username)
+
+#-------------------------------------------------------------------------
 # Handle termination signal
 #-------------------------------------------------------------------------
 
@@ -2545,6 +2633,12 @@ logger.info( 'Starting the server ...' )
 
 # Where are we? :)
 logger.info( 'Server path is set to {}'.format( executable_path ) )
+
+# Print database location
+logger.info( 'Database path is set to {}'.format( database_path ) )
+
+# Initialize the server based on configuration
+server_init()
 
 # Thread for updating the DB on the disk
 threading.Thread(target = sync_database).start()
