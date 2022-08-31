@@ -16,7 +16,7 @@ class server_config():
     self.superusers  = [ 'pi57', 'ka429' ]
 
     # Token for TravisCI
-    self.travis_token = 'sPjK7gKr2Tfez5Vg3KVJ'
+    self.travis_token = 'ocYw4zq55hiuyYvJJcBV'
 
   def getSU( self ):
     return self.superusers
