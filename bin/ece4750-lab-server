@@ -2137,7 +2137,7 @@ def get_students_dict ( succinct=False ):
   i = 0
   for i in range( len( students ) ):
 
-    students_dict[i] = students[i]
+    students_dict[str(i)] = students[i]
 
   msg = ''
 
