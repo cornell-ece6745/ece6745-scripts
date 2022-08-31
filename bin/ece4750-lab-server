@@ -2132,12 +2132,12 @@ def get_students_dict ( succinct=False ):
   msg = ''
 
   students_dict = {}
-  students      = student_info.keys()
+  students      = list( student_info.keys() )
 
   i = 0
   for i in range( len( students ) ):
 
-    students_dict[str(i)] = students[i]
+    students_dict[i] = students[i]
 
   msg = ''
 
