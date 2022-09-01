@@ -330,12 +330,12 @@ def find_empty_group( status, num_of_groups = 60 ):
 
   if status == 'g':
     for gid in [ str(x) for x in range(1, num_of_groups + 1) ]:
-      if (not gid in group_info.keys()) or (len(group_info[gid]['members']) == 0):
+      if (not gid in group_info) or (len(group_info[gid]['members']) == 0):
         return gid
 
   if status == 'a':
     for gid in [ 'a{}'.format(x) for x in range(1, num_of_groups + 1) ]:
-      if (not gid in group_info.keys()) or (len(group_info[gid]['members']) == 0):
+      if (not gid in group_info) or (len(group_info[gid]['members']) == 0):
         return gid
 
   return None
@@ -363,24 +363,24 @@ def update_group_info():
   global group_info
 
   # Remove all members information
-  for gid in group_info.keys():
+  for gid in list(group_info):
     group_info[gid]['members'] = []
 
   # Add active students back in
-  for netid in student_info.keys():
+  for netid in list(student_info):
     gid = student_info[netid]['group']
 
     if gid:
       if gid[0] == 'c':
         group_id = gid[1]
-        if group_id in group_info.keys():
+        if group_id in group_info:
           group_info[group_id]['members'].append( netid )
         else:
           group_info[group_id] = { 'members'      : [ netid ],
                                    'pending_reqs' : [       ] }
 
   # Remove empty groups
-  for gid in group_info.keys():
+  for gid in list(group_info):
     if len(group_info[gid]['members']) == 0:
       del group_info[gid]
 
@@ -396,7 +396,7 @@ def write_group_info():
 
     csvw.writerow( ['Group Number', 'Member 1', 'Member 2', 'Member 3', 'Member 4'] )
 
-    for gid in group_info.keys():
+    for gid in list(group_info):
       csvw.writerow( [gid] + group_info[gid]['members'] )
 
 def send_email( netid, name, title, kind, success=True):
@@ -613,7 +613,7 @@ def refresh_database ( force = False ):
         class_roster[netid]['NAME'] = name
 
     # Add new students
-    for netid in sorted( class_roster.keys() ):
+    for netid in sorted( list(class_roster) ):
 
       name   = class_roster[netid]['NAME']
       status = class_roster[netid]['GRADING BASIS']
@@ -626,7 +626,7 @@ def refresh_database ( force = False ):
         status = 'u'
 
       # Add!
-      if not (netid in student_info.keys()):
+      if not (netid in student_info):
 
         log += '\n' if log != '' else ''
         log += 'Adding {}'.format( netid )
@@ -680,9 +680,9 @@ def refresh_database ( force = False ):
 
     # Experimental ... :)
     # Delete departing students ...
-    for netid in student_info.keys():
+    for netid in list(student_info):
 
-      if not netid in class_roster.keys():
+      if not netid in class_roster:
         # Students dropped the course
         name = student_info[netid]['name']
         github_user = student_info[netid]['github_id']
@@ -1004,7 +1004,7 @@ def update_group_description ( group_id ):
 
   # Generate description
   group_members = []
-  if group_id in group_info.keys():
+  if group_id in group_info:
     group_members = group_info[group_id]['members']
 
   names = []
@@ -1762,7 +1762,7 @@ def join_group ( netid, group_id ):
             ' Please, contact the course\'s staff to fix this.'
   else:
     # Check if the group exists
-    if group_id in group_info.keys():
+    if group_id in group_info:
       # Check if group is still alive
       if len(group_info[group_id]['members']) > 0:
         # Acquire a lock
@@ -2145,7 +2145,7 @@ def get_students_dict ( succinct=False ):
   msg = ''
 
   students_dict = {}
-  students      = list( student_info.keys() )
+  students      = list( student_info )
 
   i = 0
   for i in range( len( students ) ):
