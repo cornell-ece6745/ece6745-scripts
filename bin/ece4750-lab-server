@@ -325,16 +325,16 @@ load_assignments_info()
 # Utils
 #-------------------------------------------------------------------------
 
-def find_empty_group( status ):
+def find_empty_group( status, num_of_groups = 60 ):
   global group_info
 
   if status == 'g':
-    for gid in [ str(x) for x in range(1, 41) ]:
+    for gid in [ str(x) for x in range(1, num_of_groups + 1) ]:
       if (not gid in group_info.keys()) or (len(group_info[gid]['members']) == 0):
         return gid
 
   if status == 'a':
-    for gid in [ 'a{}'.format(x) for x in range(1, 41) ]:
+    for gid in [ 'a{}'.format(x) for x in range(1, num_of_groups + 1) ]:
       if (not gid in group_info.keys()) or (len(group_info[gid]['members']) == 0):
         return gid
 
@@ -1325,7 +1325,7 @@ def activate_travisCI( org, repo_name, gh_token ):
 #=========================================
 # Initialize repos
 #=========================================
-def init_repos ( ):
+def init_repos ( num_of_groups = 60 ):
 
   # Globals
   global group_lock
@@ -1350,7 +1350,7 @@ def init_repos ( ):
 
   # Delete all repos
   logger.warning('  * Deleting repositories:')
-  for gid in range(1, 41):
+  for gid in range(1, num_of_groups + 1):
     group_id = str(gid)
     group_name = 'lab-group{:02d}'.format( int( group_id ) )
     logger.warning('    - {}'.format(group_name))
@@ -1363,7 +1363,7 @@ def init_repos ( ):
 
   # Delete all teams
   logger.warning('  * Deleting teams:')
-  for tid in range(1, 41):
+  for tid in range(1, num_of_groups + 1):
     team_name = 'lab-group{:02d}'.format( tid )
     logger.warning('    - {}'.format(team_name))
     try:
@@ -1405,7 +1405,7 @@ def init_repos ( ):
   logger.warning('  * Creating teams:')
   username = github_obj.get_user().login
   creating_user = github_obj.get_user(username)
-  for tid in range(1, 41):
+  for tid in range(1, num_of_groups + 1):
     team_name = 'lab-group{:02d}'.format( tid )
     logger.warning('    - {}'.format(team_name))
     team = course_org.create_team( team_name )
@@ -1422,7 +1422,7 @@ def init_repos ( ):
 
   # Generate new repos
   logger.warning('  * Creating repositories:')
-  for gid in range(1, 41):
+  for gid in range(1, num_of_groups + 1):
     group_id = str(gid)
     group_name = 'lab-group{:02d}'.format( int( group_id ) )
     logger.warning('    - {}'.format(group_name))
