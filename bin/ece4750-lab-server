@@ -589,6 +589,7 @@ def refresh_database ( force = False ):
 
   # Globals
   global student_info
+  global generic_team
 
   # Log!
   log = ''
@@ -692,12 +693,14 @@ def refresh_database ( force = False ):
             # Remove from the group
             leave_group( netid )
 
+            # Get Github user
+            github_user_obj = github_obj.get_user( github_user )
+
+            # Remove from students
+            generic_team.remove_from_members( github_user_obj )
+
             # Remove from organization
-            try:
-              course_org.remover_from_members( github_id )
-            except:
-              # Probably add to blacklist?
-              pass
+            course_org.remove_from_members( github_user_obj )
 
           # Delete student's record
           del student_info[netid]
