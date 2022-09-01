@@ -1658,10 +1658,7 @@ def leave_group ( netid ):
       subshell( cmd )
 
       # Add user
-      shadow_repo.add_to_collaborators( github_id )
-
-      # Remove authorization token
-      auth.delete()
+      shadow_repo.add_to_collaborators( github_id, permission='pull' )
 
       # Update Group
       while netid in group_info[group_id]['members']:
