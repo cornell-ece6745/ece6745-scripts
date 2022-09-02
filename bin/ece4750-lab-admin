@@ -3,27 +3,56 @@
 # ece4750-lab-admin [options]
 #=========================================================================
 #
-#  -v --verbose                           Turn on verbose mode
-#  -h --help                              Display this message
-#  -s --status                            Check current status
-#     --join-class [GitHub ID]            Update your GitHub ID
-#     --make-request [request] [argument]
-#                                         Make a request, choice =
-#                                           ( group-create, group-join,
-#                                             group-approve, group-leave )
-#     --cancel-request                    Cancel pending request
+#  -v --verbose               Turn on verbose mode
+#  -h --help                  Display this message
+#     --github set githubid   Join the course GitHub org
+#     --status                Check current status
+#     --group create          Create a new group and get group number
+#     --group join groupnum   Join group groupnum
+#     --group pending         List student attempting to join group
+#     --group approve netid   Approve student (w/ netid) to join group
+#     --group leave           Leave the group
 #
-# ece4750 lab management tool. Before makeing any request, please use
-# --join-class [GitHub ID] command to submit your GitHub ID. This is
-# required for this class.
+# Standard workflow is to first join the course GitHub org:
 #
-
-# Author : Khalid Al-Hawaj
+#  %  ece4750-lab-admin --github set githubid
+#
+# where githubid is your GitHub ID. You should receive an email
+# invitation to join the cornell-ece4750 organization from Github or you
+# can go to this link:
+#
+#  - https://github.com/orgs/cornell-ece4750/invitation
+#
+# After you have accepted the invitation, run the status command to confirm
+# that you are officially in the cornell-ece4750 GitHub organization.
+#
+#  % ece4750-lab-admin --status
+#
+# Now pick one member to create your lab group and run the following
+# command.
+#
+#  % ece4750-lab-admin --group create
+#
+# The command will display your assigned group number. Now the second group
+# member can join the group using the group number.
+#
+#  % ece4750-lab-admin --group join groupnum
+#
+# where groupnum is the assigned group number. The first group member can
+# see who is attempting to join the group and can then approve the pending
+# request to join.
+#
+#  % ece4750-lab-admin --group pending
+#  % ece4750-lab-admin --group approve netid
+#
+# Where netid is the NetID of the second group member. You can leave the
+# group like this:
+#
+#  % ece4750-lab-admin --group leave
+#
+# Author : Khalid Al-Hawaj, Moyang Wang
 # Date   : August 25, 2017
 #
-# Based off of Moyang's script. Though, this was heavly changed to adapt
-# to a proper inter-process communication rather than depending on shared
-# file reads and writes
 
 import argparse
 import sys
@@ -60,7 +89,10 @@ def parse_cmdline():
   p.add_argument(       '--students',        nargs = '+'          )
 
   opts = p.parse_args()
-  if opts.help: p.error()
+
+  if opts.help or (len(sys.argv) == 1):
+    p.error()
+
   return opts
 
 opts = parse_cmdline()
