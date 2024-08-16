@@ -1,28 +1,16 @@
 #=========================================================================
-# Toplevel Makefile for the ECE 4750 Scripts
+# Toplevel Makefile for the ECE 2300 Scripts
 #=========================================================================
 
 install_exes = \
-  $(src_dir)/bin/setup-ece4750.sh \
-  $(src_dir)/bin/setup-ece4750-2021.sh \
-  $(src_dir)/bin/ece4750-git-status \
-  $(src_dir)/bin/ece4750-git-add \
-  $(src_dir)/bin/ece4750-git-log \
+  $(src_dir)/bin/setup-ece2300.sh \
+  $(src_dir)/bin/ece2300-git-status \
+  $(src_dir)/bin/ece2300-git-add \
+  $(src_dir)/bin/ece2300-git-log \
   $(src_dir)/bin/trash \
-  $(src_dir)/bin/global_config.py \
-  $(src_dir)/bin/server_config.py \
-  $(src_dir)/bin/ece4750-lab-admin \
-  $(src_dir)/bin/ece4750-copy-repo \
-  $(src_dir)/bin/ece4750-init-repo \
-  $(src_dir)/bin/ece4750-lab-server \
-  $(src_dir)/bin/ece4750-lab-server-utils \
-  $(src_dir)/bin/riscv32-objdump \
 
 install_etcs = \
-  $(src_dir)/etc/ece4750-git-config \
-
-install_templates = \
-  $(src_dir)/bin/templates/README-template \
+  $(src_dir)/etc/ece2300-git-config \
 
 #-------------------------------------------------------------------------
 # Basic setup
@@ -100,19 +88,7 @@ install-etcs : $(install_etcs)
 	$(INSTALL_ETC) $(src_dir)/etc/ece4750-git-config \
                  $(DESTDIR)/etc/gitconfig.d
 
-# Just deal with this install manually for now
-
-install-templates : $(install_templates)
-	$(MKINSTALLDIRS) $(DESTDIR)/bin/templates
-	$(MKINSTALLDIRS) $(DESTDIR)/bin/templates/gitconfig.d
-	$(INSTALL_ETC) $(src_dir)/etc/ece4750-git-config \
-	         $(DESTDIR)/bin/templates/gitconfig.d
-	for file in $(install_templates); \
-  do \
-    $(INSTALL_EXE) $$file $(install_templates_dir); \
-  done
-
-install : install-exes install-etcs install-templates
+install : install-exes install-etcs
 ifeq ($(enable_stow),yes)
 	$(MKINSTALLDIRS) $(stow_pkg_dir)
 	cd $(stow_pkg_dir) && \

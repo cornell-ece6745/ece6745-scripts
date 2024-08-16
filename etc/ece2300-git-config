@@ -3,16 +3,16 @@
 #=========================================================================
 
 [alias]
-  xstatus="!ece4750-git-status"
-  xadd="!ece4750-git-add"
-  xlog="!ece4750-git-log"
-  xlogr="!ece4750-git-log -r"
+  xstatus="!ece2300-git-status"
+  xadd="!ece2300-git-add"
+  xlog="!ece2300-git-log"
+  xlogr="!ece2300-git-log -r"
   xpull="pull --rebase"
 
 [alias]
-  xs="!ece4750-git-status"
-  xa="!ece4750-git-add"
-  xl="!ece4750-git-log"
-  xlr="!ece4750-git-log -r"
+  xs="!ece2300-git-status"
+  xa="!ece2300-git-add"
+  xl="!ece2300-git-log"
+  xlr="!ece2300-git-log -r"
   xp="pull --rebase"
 

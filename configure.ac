@@ -1,14 +1,14 @@
 #=========================================================================
-# Toplevel configure.ac for the ECE 4750 scripts
+# Toplevel configure.ac for the ECE 2300 scripts
 #=========================================================================
 
 #-------------------------------------------------------------------------
 # Project metadata
 #-------------------------------------------------------------------------
 
-m4_define( proj_name,         [ECE 4750 Scripts])
+m4_define( proj_name,         [ECE 2300 Scripts])
 m4_define( proj_maintainer,   [Christopher Batten])
-m4_define( proj_abbreviation, [ece4750-scripts])
+m4_define( proj_abbreviation, [ece2300-scripts])
 
 #-------------------------------------------------------------------------
 # Project version information
@@ -28,7 +28,7 @@ m4_define( proj_version, [?])
 #-------------------------------------------------------------------------
 
 AC_INIT(proj_name,proj_version,proj_maintainer,proj_abbreviation)
-AC_CONFIG_SRCDIR([bin/setup-ece4750.sh])
+AC_CONFIG_SRCDIR([bin/setup-ece2300.sh])
 AC_CONFIG_AUX_DIR([scripts])
 AC_CANONICAL_BUILD
 AC_CANONICAL_HOST
