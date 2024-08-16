@@ -262,7 +262,7 @@ source "${ECE2300_INSTALL}/pkgs/modules-5.4.0/init/bash"
 
 module use "${ECE2300_INSTALL}/modules"
 
-export MODULES_COLORS="hi=1:db=2:tr=2:se=2:er=91:wa=93:me=95:in=94:mp=1;94:di=94:al=96:va=93:sy=95:de=4:cm=92:aL=4:L=1;32:H=2:F=41:nF=43:S=46:sS=44:kL=30;48;5;109"
+export MODULES_COLORS="hi=1:db=2:tr=2:se=2:er=91:wa=93:me=95:in=94:mp=1;94:di=94:al=96:va=93:sy=95:de=4:cm=92:aL=4:L=4;32:H=2:F=41:nF=43:S=46:sS=44:kL=30;48;5;109"
 export MODULES_COLLECTION_PIN_VERSION=1
 
 #-------------------------------------------------------------------------

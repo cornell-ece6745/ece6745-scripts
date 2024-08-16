@@ -85,7 +85,7 @@ install-exes : $(install_exes)
 install-etcs : $(install_etcs)
 	$(MKINSTALLDIRS) $(DESTDIR)/etc
 	$(MKINSTALLDIRS) $(DESTDIR)/etc/gitconfig.d
-	$(INSTALL_ETC) $(src_dir)/etc/ece4750-git-config \
+	$(INSTALL_ETC) $(src_dir)/etc/ece2300-git-config \
                  $(DESTDIR)/etc/gitconfig.d
 
 install : install-exes install-etcs
