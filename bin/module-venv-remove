@@ -1,0 +1,69 @@
+#!/bin/bash
+#=========================================================================
+# module-venv-remove [options] venv-name
+#=========================================================================
+#
+#  -h  Display this message
+#  -v  Verbose mode
+#
+# Delete the given Python virtual environment and corresponding
+# environment module. The venv-name must include the venvs/py3.xx.yy
+# prefix.
+#
+# Author : Christopher Batten
+# Date   : August 16, 2024
+
+set -e
+
+#-------------------------------------------------------------------------
+# Command line parsing
+#-------------------------------------------------------------------------
+
+function usage
+{
+  echo ""
+  sed -n '3p' $0 | sed -e 's/#//'
+  sed -n '5,/^$/p' $0 | sed -e 's/#//'
+  exit 1
+}
+
+verbose=no
+while getopts "hvr" OPTION; do
+  case $OPTION in
+    v)   verbose=yes ;;
+    h|?) usage ;;
+  esac
+done
+
+if [ $# -eq 0 ]; then
+  echo ""
+  echo " ERROR: No virtual environment name given!"
+  echo ""
+  exit 1
+fi
+
+if [[ ! $1 == "venvs/py"* ]]; then
+  echo ""
+  echo " ERROR: Given virtual environment needs to start with 'venvs/py'!"
+  echo ""
+  exit 1
+fi
+
+#-------------------------------------------------------------------------
+# Main
+#-------------------------------------------------------------------------
+
+# Make sure venv is unloaded
+
+if module is-loaded $1; then
+  module unload $1
+fi
+
+# Remove the module file
+
+rm ${ECE2300_INSTALL}/modules/$1
+
+# Remove the environment module
+
+rm -rf ${ECE2300_INSTALL}/$1
+

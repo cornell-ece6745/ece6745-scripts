@@ -8,6 +8,8 @@ install_exes = \
   $(src_dir)/bin/ece2300-git-add \
   $(src_dir)/bin/ece2300-git-log \
   $(src_dir)/bin/trash \
+  $(src_dir)/bin/module-venv-create \
+  $(src_dir)/bin/module-venv-remove \
 
 install_etcs = \
   $(src_dir)/etc/ece2300-git-config \

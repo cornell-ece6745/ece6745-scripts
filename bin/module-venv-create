@@ -1,0 +1,94 @@
+#!/bin/bash
+#=========================================================================
+# module-venv-create [options] venv-name
+#=========================================================================
+#
+#  -h  Display this message
+#  -v  Verbose mode
+#
+# Create a new Python virtual environment and also create a
+# corresponding environment module to enable loading/unloading this
+# virtual environment.
+#
+# Author : Christopher Batten
+# Date   : August 16, 2024
+
+set -e
+
+#-------------------------------------------------------------------------
+# Command line parsing
+#-------------------------------------------------------------------------
+
+function usage
+{
+  echo ""
+  sed -n '3p' $0 | sed -e 's/#//'
+  sed -n '5,/^$/p' $0 | sed -e 's/#//'
+  exit 1
+}
+
+verbose=no
+while getopts "hvr" OPTION; do
+  case $OPTION in
+    v)   verbose=yes ;;
+    h|?) usage ;;
+  esac
+done
+
+if [ $# -eq 0 ]; then
+  echo ""
+  echo " ERROR: No virtual environment name given!"
+  echo ""
+  exit 1
+fi
+
+#-------------------------------------------------------------------------
+# Main
+#-------------------------------------------------------------------------
+
+# Make sure python is available
+
+if ! command -v python3 >/dev/null 2>&1; then
+  echo ""
+  echo " ERROR: python3 is not found!"
+  echo ""
+  exit 1
+fi
+
+# Determine python version number
+
+python_version=$(python3 --version 2>&1)
+python_vernum=${python_version#Python }
+
+# Check to see if we are using a python environment module
+
+python_prereq=""
+if module is-loaded python; then
+  python_prereq="prereq   python/${python_vernum}"
+fi
+
+# Make sure the venv directory exists
+
+mkdir -p ${ECE2300_INSTALL}/venvs
+
+# Create the virtual environment
+
+python3 -m venv ${ECE2300_INSTALL}/venvs/py${python_vernum}-$1
+
+# Create the corresponding environment module
+
+mkdir -p ${ECE2300_INSTALL}/modules/venvs
+cd ${ECE2300_INSTALL}/modules/venvs
+cat > py${python_vernum}-$1 \
+<<END
+#%Module1.0
+
+conflict venvs
+${python_prereq}
+
+unsetenv     PYTHONHOME
+setenv       VIRTUAL_ENV /classes/ece2300/install/venvs/py${python_vernum}-$1
+prepend-path PATH        /classes/ece2300/install/venvs/py${python_vernum}-$1/bin
+
+END
+
