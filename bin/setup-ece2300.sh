@@ -56,36 +56,6 @@ function printn
 }
 
 #-------------------------------------------------------------------------
-# append_to_pathlist
-#-------------------------------------------------------------------------
-# This is a useful helper function which we will use in our setup scripts
-# to add a path to a pathlist. The function first checks to see if the
-# path is already on the pathlist, and if so it removes the path. Once we
-# know that the path is not already on the pathlist, we append it to the
-# front of the path list. This makes sourcing setup scripts idempotent,
-# i.e., we can source setup scripts multiple times without any impact on
-# the overall setup.
-
-function append_to_pathlist
-{
-  # get pathlist into local pathlist (add : at end)
-  eval "temp_pathlist=\$$1:"
-
-  # remove new path from local pathlist if exists
-  temp_pathlist=${temp_pathlist//"$2:"}
-
-  # append new path to front of local pathlist
-  if [[ "${temp_pathlist}" == ":" ]]; then
-    temp_pathlist="$2"
-  else
-    temp_pathlist="$2:${temp_pathlist}"
-  fi
-
-  # set pathlist to local pathlist (remove : at end)
-  export $1=${temp_pathlist%":"}
-}
-
-#-------------------------------------------------------------------------
 # Make sure this script is only sourced once
 #-------------------------------------------------------------------------
 
@@ -269,6 +239,18 @@ export MODULES_COLLECTION_PIN_VERSION=1
 # Load environment modules
 #-------------------------------------------------------------------------
 
+function module_load
+{
+  print "  - Loading module: $1"
+  module load $1
+}
+
+module_load ece2300-scripts/0.0
+module_load gcc/13.2.1
+module_load iverilog/12.0
+module_load verilator/5.026
+module_load gtkwave/3.3.120
+module_load python/3.11.9
 
 #-------------------------------------------------------------------------
 # Git initialization commands
