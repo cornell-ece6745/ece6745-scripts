@@ -55,16 +55,38 @@ if ! command -v python3 >/dev/null 2>&1; then
   exit 1
 fi
 
-# Determine python version number
+# Determine python version number (works for cpython and pypy)
 
 python_version=$(python3 --version 2>&1)
-python_vernum=${python_version#Python }
+python_vernum=$(echo "$python_version" | sed -n 's/^Python \([0-9]\+\.[0-9]\+\.[0-9]\+\).*/\1/p')
+
+echo "python_version = ${python_version}"
+echo "python_vernum  = ${python_vernum}"
+
+# Check if using pypy
+
+if [[ $python_version == *"PyPy"* ]]; then
+  python_prefix="pypy"
+  pypy_vernum=$(echo "$python_version" | sed -n 's/.*PyPy \([0-9]\+\.[0-9]\+\.[0-9]\+\).*/\1/p')
+  python_vernum="${python_vernum}v${pypy_vernum}"
+else
+  python_prefix="py"
+fi
+
+echo "python_prefix  = ${python_prefix}"
+echo "python_version = ${python_version}"
+echo "python_vernum  = ${python_vernum}"
 
 # Check to see if we are using a python environment module
 
 python_prereq=""
+
 if module is-loaded python; then
   python_prereq="prereq   python/${python_vernum}"
+fi
+
+if module is-loaded pypy; then
+  python_prereq="prereq   pypy/${python_vernum}"
 fi
 
 # Make sure the venv directory exists
@@ -73,13 +95,13 @@ mkdir -p ${ECE2300_INSTALL}/venvs
 
 # Create the virtual environment
 
-python3 -m venv ${ECE2300_INSTALL}/venvs/py${python_vernum}-$1
+python3 -m venv ${ECE2300_INSTALL}/venvs/${python_prefix}${python_vernum}-$1
 
 # Create the corresponding environment module
 
 mkdir -p ${ECE2300_INSTALL}/modules/venvs
 cd ${ECE2300_INSTALL}/modules/venvs
-cat > py${python_vernum}-$1 \
+cat > ${python_prefix}${python_vernum}-$1 \
 <<END
 #%Module1.0
 
@@ -87,8 +109,8 @@ conflict venvs
 ${python_prereq}
 
 unsetenv     PYTHONHOME
-setenv       VIRTUAL_ENV /classes/ece2300/install/venvs/py${python_vernum}-$1
-prepend-path PATH        /classes/ece2300/install/venvs/py${python_vernum}-$1/bin
+setenv       VIRTUAL_ENV /classes/ece2300/install/venvs/${python_prefix}${python_vernum}-$1
+prepend-path PATH        /classes/ece2300/install/venvs/${python_prefix}${python_vernum}-$1/bin
 
 END
 
