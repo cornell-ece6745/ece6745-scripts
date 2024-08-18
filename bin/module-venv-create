@@ -60,9 +60,6 @@ fi
 python_version=$(python3 --version 2>&1)
 python_vernum=$(echo "$python_version" | sed -n 's/^Python \([0-9]\+\.[0-9]\+\.[0-9]\+\).*/\1/p')
 
-echo "python_version = ${python_version}"
-echo "python_vernum  = ${python_vernum}"
-
 # Check if using pypy
 
 if [[ $python_version == *"PyPy"* ]]; then
@@ -72,10 +69,6 @@ if [[ $python_version == *"PyPy"* ]]; then
 else
   python_prefix="py"
 fi
-
-echo "python_prefix  = ${python_prefix}"
-echo "python_version = ${python_version}"
-echo "python_vernum  = ${python_vernum}"
 
 # Check to see if we are using a python environment module
 
@@ -113,4 +106,8 @@ setenv       VIRTUAL_ENV /classes/ece2300/install/venvs/${python_prefix}${python
 prepend-path PATH        /classes/ece2300/install/venvs/${python_prefix}${python_vernum}-$1/bin
 
 END
+
+# Output name of new environment module
+
+echo "created new environment module: venvs/${python_prefix}${python_vernum}-$1"
 
