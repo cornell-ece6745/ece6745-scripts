@@ -73,7 +73,7 @@ fi
 
 # Recreate venv name if we are using a python environment module
 
-python_prereq=""
+prereq_str=""
 
 if module is-loaded python; then
   python_module_info=$(module info-loaded python)
@@ -106,7 +106,7 @@ cat > ${venv_name}-$1 \
 #%Module1.0
 
 conflict venvs
-${python_prereq}
+${prereq_str}
 
 unsetenv     PYTHONHOME
 setenv       VIRTUAL_ENV /classes/ece2300/install/venvs/${venv_name}-$1
