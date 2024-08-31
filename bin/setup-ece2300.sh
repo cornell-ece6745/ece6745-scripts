@@ -56,6 +56,63 @@ function printn
 }
 
 #-------------------------------------------------------------------------
+# Start
+#-------------------------------------------------------------------------
+
+print ""
+print " Running ECE 2300 setup script"
+
+#-------------------------------------------------------------------------
+# Auto setup
+#-------------------------------------------------------------------------
+
+print "  - enable  auto setup: ${enable_auto_setup}"
+print "  - disable auto setup: ${disable_auto_setup}"
+
+if [[ "${enable_auto_setup}" == "yes" ]]; then
+
+  print "  - removing line to source setup script from .bashrc"
+
+  rm -rf ${HOME}/.bashrc.bak
+  sed -i.bak -e '/# ECE2300 BEGIN SETUP/,/# ECE2300 END SETUP/d' ${HOME}/.bashrc
+
+  print "  - adding line to source setup script to .bashrc"
+  echo "# ECE2300 BEGIN SETUP"                     >> ${HOME}/.bashrc
+  echo ""                                          >> ${HOME}/.bashrc
+  echo "source /classes/setup/setup-ece2300.sh -q" >> ${HOME}/.bashrc
+  echo ""                                          >> ${HOME}/.bashrc
+  echo "# ECE2300 END SETUP"                       >> ${HOME}/.bashrc
+
+  echo ""
+  echo " NOTE: Your login script has been updated so that it will"
+  echo " automatically source the setup script every time you log"
+  echo " ecelinux. You can disable this behavior with this command:"
+  echo ""
+  echo "  % source setup-ece2300.sh --disable-auto-setup"
+  echo ""
+  echo " After disabling auto setup you will need manually source"
+  echo " the setup script every time you want to work on the course"
+  echo ""
+
+fi
+
+if [[ "${disable_auto_setup}" == "yes" ]]; then
+
+  print "  - removing line to source setup script from .bashrc"
+
+  rm -rf ${HOME}/.bashrc.bak
+  sed -i.bak -e '/# ECE2300 BEGIN SETUP/,/# ECE2300 END SETUP/d' ${HOME}/.bashrc
+
+  echo ""
+  echo " NOTE: Your login script has been updated so that it will"
+  echo " no longer automatically source the setup script every time"
+  echo " you log into ecelinux.  You will need manually source"
+  echo " the setup script every time you want to work on the course"
+  echo ""
+
+fi
+
+#-------------------------------------------------------------------------
 # Make sure this script is only sourced once
 #-------------------------------------------------------------------------
 
@@ -116,13 +173,6 @@ fi
 
 export SETUP_COURSE="ece2300"
 export SETUP_ECE2300="yes"
-
-#-------------------------------------------------------------------------
-# Start
-#-------------------------------------------------------------------------
-
-print ""
-print " Running ECE 2300 setup script"
 
 #-------------------------------------------------------------------------
 # Determine if we need to rerun initialization commands
@@ -296,54 +346,6 @@ print "  - Setting up prompt"
 
 export PS1="\[\e[1;34m\]ECE2300:\[\e[0m\] \[\e[1m\]\w\[\e[0m\] % "
 export PROMPT_DIRTRIM=2
-
-#-------------------------------------------------------------------------
-# Auto setup
-#-------------------------------------------------------------------------
-
-print "  - enable  auto setup: ${enable_auto_setup}"
-print "  - disable auto setup: ${disable_auto_setup}"
-
-if [[ "${enable_auto_setup}" == "yes" ]]; then
-
-  print "  - removing line to source setup script from .bashrc"
-
-  rm -rf ${HOME}/.bashrc.bak
-  sed -i.bak -e '/# ECE2300 BEGIN SETUP/,/# ECE2300 END SETUP/d' ${HOME}/.bashrc
-
-  print "  - adding line to source setup script to .bashrc"
-  echo "# ECE2300 BEGIN SETUP"                     >> ${HOME}/.bashrc
-  echo ""                                          >> ${HOME}/.bashrc
-  echo "source /classes/setup/setup-ece2300.sh -q" >> ${HOME}/.bashrc
-  echo ""                                          >> ${HOME}/.bashrc
-  echo "# ECE2300 END SETUP"                       >> ${HOME}/.bashrc
-
-  echo ""
-  echo " NOTE: Your login script has been updated so that it will"
-  echo " automatically source the setup script every time you log"
-  echo " ecelinux. You can disable this behavior with this command:"
-  echo ""
-  echo "  % source setup-ece2300.sh --disable-auto-setup"
-  echo ""
-  echo " After disabling auto setup you will need manually source"
-  echo " the setup script every time you want to work on the course"
-
-fi
-
-if [[ "${disable_auto_setup}" == "yes" ]]; then
-
-  print "  - removing line to source setup script from .bashrc"
-
-  rm -rf ${HOME}/.bashrc.bak
-  sed -i.bak -e '/# ECE2300 BEGIN SETUP/,/# ECE2300 END SETUP/d' ${HOME}/.bashrc
-
-  echo ""
-  echo " NOTE: Your login script has been updated so that it will"
-  echo " no longer automatically source the setup script every time"
-  echo " you log into ecelinux.  You will need manually source"
-  echo " the setup script every time you want to work on the course"
-
-fi
 
 #-------------------------------------------------------------------------
 # Done
