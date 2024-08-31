@@ -294,7 +294,7 @@ export EDITOR="nano"
 
 print "  - Setting up prompt"
 
-PS1="\[\e[1;34m\]ECE2300:\[\e[0m\] \[\e[1m\]\w\[\e[0m\] % "
+export PS1="\[\e[1;34m\]ECE2300:\[\e[0m\] \[\e[1m\]\w\[\e[0m\] % "
 export PROMPT_DIRTRIM=2
 
 #-------------------------------------------------------------------------
