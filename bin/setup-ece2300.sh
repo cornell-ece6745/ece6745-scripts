@@ -186,7 +186,7 @@ export SETUP_ECE2300="yes"
 # increasing the count.
 
 run_init_cmds_last_ver="?"
-run_init_cmds_curr_ver="1"
+run_init_cmds_curr_ver="2"
 run_init_cmds="yes"
 if [[ -f "${HOME}/.setup-ece2300" ]]; then
   run_init_cmds_last_ver=$(tail -1 "${HOME}/.setup-ece2300")
@@ -323,6 +323,7 @@ if [[ "${run_init_cmds}" == "yes" ]]; then
   netid=$(whoami)
   git config --global user.name  "${netid}"
   git config --global user.email "${netid}@cornell.edu"
+  git config --global pull.rebase false
 
 fi
 
