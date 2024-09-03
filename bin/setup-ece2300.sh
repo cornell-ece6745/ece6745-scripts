@@ -349,6 +349,26 @@ export PS1="\[\e[1;34m\]ECE2300:\[\e[0m\] \[\e[1m\]\w\[\e[0m\] % "
 export PROMPT_DIRTRIM=2
 
 #-------------------------------------------------------------------------
+# .bash_profile
+#-------------------------------------------------------------------------
+# Cornell sysadmins wrote "The default file .bash_profile in a user's
+# home directory forces .bashrc to be sourced at the start of an
+# interactive session. This file has been automatically added to all
+# newly created (after the ecelinux and NFS servers were converted to
+# RHEL 8) ecelinux users when their home directory is created for the
+# first time. However, this file was not added to users home directory
+# originally. It seems that CentOS has added it at some point, since
+# about 1100 (out of over 1300) home directories do have it and should
+# work. A workaround for those users who are having an issue (and don't
+# have that file in their home directory) with it would be to copy
+# /etc/skel/.bash_profile into their home directory, then log out and
+# back in."
+
+if [[ ! -f "${HOME}/.bash_profile" ]]; then
+  cp /etc/skel/.bash_profile ${HOME}/.bash_profile
+fi
+
+#-------------------------------------------------------------------------
 # Done
 #-------------------------------------------------------------------------
 
