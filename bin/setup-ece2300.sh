@@ -300,6 +300,7 @@ module_load gcc/13.2.1
 module_load iverilog/12.0
 module_load verilator/5.026
 module_load gtkwave/3.3.120
+module_load gh/2.56.02024-09-13
 module_load quartus-prime-lite/18.1.0
 module_load python/3.11.9
 module_load venvs/py3.11.9-default
