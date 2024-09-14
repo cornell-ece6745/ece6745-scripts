@@ -296,6 +296,7 @@ function module_load
 }
 
 module_load ece2300-scripts/0.0
+module_load bash-completion/2.14.0
 module_load gcc/13.2.1
 module_load iverilog/12.0
 module_load verilator/5.026
