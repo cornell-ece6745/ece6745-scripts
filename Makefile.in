@@ -1,18 +1,19 @@
 #=========================================================================
-# Toplevel Makefile for the ECE 2300 Scripts
+# Toplevel Makefile for the ECE 6745 Scripts
 #=========================================================================
 
 install_exes = \
-  $(src_dir)/bin/setup-ece2300.sh \
-  $(src_dir)/bin/ece2300-git-status \
-  $(src_dir)/bin/ece2300-git-add \
-  $(src_dir)/bin/ece2300-git-log \
+  $(src_dir)/bin/setup-ece6745.sh \
+  $(src_dir)/bin/ece6745-git-status \
+  $(src_dir)/bin/ece6745-git-add \
+  $(src_dir)/bin/ece6745-git-log \
   $(src_dir)/bin/trash \
   $(src_dir)/bin/module-venv-create \
   $(src_dir)/bin/module-venv-remove \
+  $(src_dir)/bin/riscv32-objdump \
 
 install_etcs = \
-  $(src_dir)/etc/ece2300-git-config \
+  $(src_dir)/etc/ece6745-git-config \
 
 #-------------------------------------------------------------------------
 # Basic setup
@@ -87,7 +88,7 @@ install-exes : $(install_exes)
 install-etcs : $(install_etcs)
 	$(MKINSTALLDIRS) $(DESTDIR)/etc
 	$(MKINSTALLDIRS) $(DESTDIR)/etc/gitconfig.d
-	$(INSTALL_ETC) $(src_dir)/etc/ece2300-git-config \
+	$(INSTALL_ETC) $(src_dir)/etc/ece6745-git-config \
                  $(DESTDIR)/etc/gitconfig.d
 
 install : install-exes install-etcs
