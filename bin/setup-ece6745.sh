@@ -280,7 +280,7 @@ function module_load
 module_load ece6745-scripts/0.0
 module_load bash-completion/2.16.0
 module_load gcc/13.2.1
-module_load gh/2.56.0
+module_load gh/2.65.0
 module_load iverilog/12.0
 module_load verilator/5.032
 module_load gtkwave/3.3.121
