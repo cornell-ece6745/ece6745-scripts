@@ -61,9 +61,9 @@ fi
 
 # Remove the module file
 
-rm ${ECE2300_INSTALL}/modules/$1
+rm ${ECE6745_INSTALL}/modules/$1
 
 # Remove the environment module
 
-rm -rf ${ECE2300_INSTALL}/$1
+rm -rf ${ECE6745_INSTALL}/$1
 

@@ -91,16 +91,16 @@ fi
 
 # Make sure the venv directory exists
 
-mkdir -p ${ECE2300_INSTALL}/venvs
+mkdir -p ${ECE6745_INSTALL}/venvs
 
 # Create the virtual environment
 
-python3 -m venv ${ECE2300_INSTALL}/venvs/${venv_name}-$1
+python3 -m venv ${ECE6745_INSTALL}/venvs/${venv_name}-$1
 
 # Create the corresponding environment module
 
-mkdir -p ${ECE2300_INSTALL}/modules/venvs
-cd ${ECE2300_INSTALL}/modules/venvs
+mkdir -p ${ECE6745_INSTALL}/modules/venvs
+cd ${ECE6745_INSTALL}/modules/venvs
 cat > ${venv_name}-$1 \
 <<END
 #%Module1.0
