@@ -286,6 +286,7 @@ module_load verilator/5.032
 module_load gtkwave/3.3.121
 module_load python/3.11.9
 module_load venvs/py3.11.9-default
+module_load riscv-gnu-toolchain/2022
 
 #-------------------------------------------------------------------------
 # Git initialization commands
