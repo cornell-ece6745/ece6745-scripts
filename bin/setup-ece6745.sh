@@ -259,7 +259,6 @@ chmod 600 ~/.ssh/ece6745-github
 #-------------------------------------------------------------------------
 
 export ECE6745_INSTALL="/classes/ece6745/install"
-export ECE6745_STDCELLS="${ECE6745_INSTALL}/adks/freepdk-45nm/stdview"
 export PATH="${ECE6745_INSTALL}/pkgs/modules-5.5.0/bin:${PATH}"
 source "${ECE6745_INSTALL}/pkgs/modules-5.5.0/init/bash"
 
@@ -300,11 +299,20 @@ module_load riscv-gnu-toolchain/2022
 # ASIC Open-Source Tools
 
 module_load klayout/0.29.11
+module_load ngspice/44.2
 
 # ASIC Commercial Tools
 
 module_load synopsys-vcs/2023.12-SP2-1
 module_load synopsys-dc/2023.12-SP5
+
+#-------------------------------------------------------------------------
+# Environment Variables
+#-------------------------------------------------------------------------
+
+export ECE6745_STDCELLS="${ECE6745_INSTALL}/adks/freepdk-45nm/stdview"
+export CANVAS_API_COURSEID="72710"
+export GITHUB_ORG="cornell-ece6745"
 
 #-------------------------------------------------------------------------
 # Git initialization commands
