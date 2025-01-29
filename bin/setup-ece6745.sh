@@ -299,6 +299,8 @@ module_load riscv-gnu-toolchain/2022
 
 # ASIC Open-Source Tools
 
+module_load klayout/0.29.11
+
 # ASIC Commercial Tools
 
 module_load synopsys-vcs/2023.12-SP2-1
