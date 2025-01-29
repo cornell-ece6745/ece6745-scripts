@@ -259,6 +259,7 @@ chmod 600 ~/.ssh/ece6745-github
 #-------------------------------------------------------------------------
 
 export ECE6745_INSTALL="/classes/ece6745/install"
+export ECE6745_STDCELLS="${ECE6745_INSTALL}/adks/freepdk-45nm/stdview"
 export PATH="${ECE6745_INSTALL}/pkgs/modules-5.5.0/bin:${PATH}"
 source "${ECE6745_INSTALL}/pkgs/modules-5.5.0/init/bash"
 
