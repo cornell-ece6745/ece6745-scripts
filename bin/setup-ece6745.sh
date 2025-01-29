@@ -278,6 +278,8 @@ function module_load
   module load $1
 }
 
+# RTL Development Tools
+
 module_load ece6745-scripts/0.0
 module_load bash-completion/2.16.0
 module_load gcc/13.2.1
@@ -285,9 +287,22 @@ module_load gh/2.65.0
 module_load iverilog/12.0
 module_load verilator/5.032
 module_load gtkwave/3.3.121
+
+# Python Environment
+
 module_load python/3.11.9
 module_load venvs/py3.11.9-default
+
+# RISC-V Cross-Compiler
+
 module_load riscv-gnu-toolchain/2022
+
+# ASIC Open-Source Tools
+
+# ASIC Commercial Tools
+
+module_load synopsys-vcs/2023.12-SP2-1
+module_load synopsys-dc/2023.12-SP5
 
 #-------------------------------------------------------------------------
 # Git initialization commands
