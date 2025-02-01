@@ -9,7 +9,7 @@
 # Do nothing if this is not an interactive shell
 #-------------------------------------------------------------------------
 
-if [[ ! $- =~ "i" ]]; then
+if [[ ! $- =~ "i" ]] || [[ "x$1" == "x-f" ]]; then
   return
 fi
 
