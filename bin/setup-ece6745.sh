@@ -305,6 +305,7 @@ module_load ngspice/44.2
 
 module_load synopsys-vcs/2023.12-SP2-1
 module_load synopsys-dc/2023.12-SP5
+module_load cadence-innovus/23.12-s091_1
 
 #-------------------------------------------------------------------------
 # Environment Variables
