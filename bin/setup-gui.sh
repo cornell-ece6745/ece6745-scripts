@@ -13,10 +13,10 @@
 
 # Check if setup-brg.sh has been sourced
 
-if [[ "x${SETUP_ECE6745}" != "xyes" ]]; then
+if [[ "x${SETUP_BRG}" != "xyes" ]]; then
   echo ""
-  echo " The setup-ece6745.sh script has not been sourced yet. Please"
-  echo " source setup-ece6745.sh and then resource this setup script."
+  echo " The setup-brg.sh script has not been sourced yet. Please source"
+  echo " setup-brg.sh and then resource this setup script."
   echo ""
   return
 fi
@@ -25,10 +25,10 @@ fi
 # Command line processing
 #-------------------------------------------------------------------------
 
-if [[ "x$1" == "x-v" ]] || [[ "x$2" == "x-v" ]]; then
-  quiet="no"
-else
+if [[ "x$1" == "x-q" ]] || [[ "x$2" == "x-q" ]]; then
   quiet="yes"
+else
+  quiet="no"
 fi
 
 #-------------------------------------------------------------------------
