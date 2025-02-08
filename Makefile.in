@@ -4,6 +4,7 @@
 
 install_exes = \
   $(src_dir)/bin/setup-ece6745.sh \
+  $(src_dir)/bin/setup-gui.sh \
   $(src_dir)/bin/ece6745-git-status \
   $(src_dir)/bin/ece6745-git-add \
   $(src_dir)/bin/ece6745-git-log \
