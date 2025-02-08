@@ -58,8 +58,11 @@ fi
 #-------------------------------------------------------------------------
 # Get Xvnc port
 #-------------------------------------------------------------------------
+# - use ps and grep to get the Xvnc command line
+# - use sed to remove leading whitespcae
+# - use cut to get the third field which should be the port number
 
-xvnc_port=$(ps -u $USER -o pid,cmd | grep '[X]vnc' | cut -d' ' -f4)
+xvnc_port=$(ps -u $USER -o pid,cmd | grep '[X]vnc' | sed -e 's/^[ ]*//' | cut -d' ' -f3)
 
 print "  - Xnvc command line: ${xvnc_running}"
 print "  - Xnvc port: ${xvnc_port}"
