@@ -12,6 +12,7 @@ install_exes = \
   $(src_dir)/bin/module-venv-create \
   $(src_dir)/bin/module-venv-remove \
   $(src_dir)/bin/riscv32-objdump \
+  $(src_dir)/bin/pyhflow \
 
 install_etcs = \
   $(src_dir)/etc/ece6745-git-config \

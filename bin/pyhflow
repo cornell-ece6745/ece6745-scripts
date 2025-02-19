@@ -1,0 +1,239 @@
+#!/usr/bin/env python3
+#=========================================================================
+# pyhflow --key=value <yaml>
+#=========================================================================
+# Generate a flow based on the given YAML file and steps templated using
+# the Python jinja2 library. The YAML file should have the following
+# structure:
+#
+# steps:
+#  - step0
+#  - step1
+#  - step2
+#
+# key : value0
+# key : value1
+# key : value2
+#
+# list0:
+#  - value0
+#  - value1
+#  - value2
+#
+# pyhflow will: (1) find the steps by looking in ../steps relative to the
+# location of the given YAML file; (2) copy the steps into the current
+# working directory; (3) substitute the given key/values into the files
+# using the Python jinja2 library; and (4) create a top-level run-flow
+# script which will run all of the steps in sequence.
+#
+# You can also specify key/value pairs on the command line in which case
+# they will take priority over what is in the YAML file.
+#
+
+import os
+import sys
+import shutil
+import argparse
+import yaml
+
+from jinja2 import Environment, StrictUndefined
+
+#-------------------------------------------------------------------------
+# load_yaml
+#-------------------------------------------------------------------------
+# Load steps and key-value pairs from a YAML file
+
+def load_yaml(yaml_file):
+  try:
+    with open(yaml_file, "r") as file:
+      data = yaml.safe_load(file) or {}
+      return data
+  except FileNotFoundError:
+    print(f"Error: YAML file '{yaml_file}' not found.", file=sys.stderr)
+    sys.exit(1)
+  except yaml.YAMLError as e:
+    print(f"Error parsing YAML file '{yaml_file}': {e}", file=sys.stderr)
+    sys.exit(1)
+
+#-------------------------------------------------------------------------
+# parse_command_line_args
+#-------------------------------------------------------------------------
+# Parse command-line arguments and convert key-value pairs into a
+# dictionary
+
+def parse_command_line_args():
+
+  parser = argparse.ArgumentParser()
+  parser.add_argument("yaml_file", help="YAML file with list of steps and template variables.")
+  parser.add_argument("--params", nargs="*", help="Key-value pairs in the format --key=value", default=[])
+
+  args, unknown_args = parser.parse_known_args()
+
+  # Extract command-line key-value pairs
+
+  cmd_context = {}
+  for arg in unknown_args:
+    if arg.startswith("--") and "=" in arg:
+      key, value = arg[2:].split("=", 1)
+      cmd_context[key] = value
+
+  # Load YAML file variables
+
+  yaml_context = load_yaml(args.yaml_file)
+  steps = yaml_context.get("steps", [])
+
+  # Merge dictionaries: command-line variables override YAML file variables
+
+  final_context = {**yaml_context, **cmd_context}
+
+  return args.yaml_file, steps, final_context
+
+#-------------------------------------------------------------------------
+# get_step_paths
+#-------------------------------------------------------------------------
+# Compute the full paths for step directories relative to the YAML file
+
+def get_step_paths(yaml_path, steps):
+  yaml_dir = os.path.dirname(yaml_path)
+  steps_root = os.path.join(yaml_dir, "..", "steps")  # "../steps" from YAML location
+  step_paths = {step: os.path.join(steps_root, step) for step in steps}
+  return step_paths
+
+#-------------------------------------------------------------------------
+# create_directory_copy
+#-------------------------------------------------------------------------
+# Copy files from source_dir to destination_dir, overwriting existing
+# files but preserving others
+
+def create_directory_copy(source_dir, destination_dir):
+  if not os.path.exists(source_dir):
+    print(f"Warning: Step directory '{source_dir}' does not exist. Skipping.", file=sys.stderr)
+    return
+
+  # Ensure destination directory exists
+
+  os.makedirs(destination_dir, exist_ok=True)
+
+  # Keep track of files that were copied
+
+  copied_files = []
+
+  for root, dirs, files in os.walk(source_dir):
+
+    # Compute relative path from source directory
+
+    rel_path = os.path.relpath(root, source_dir)
+
+    if rel_path != ".":
+      target_root = os.path.join(destination_dir, rel_path)
+    else:
+      target_root = destination_dir
+
+    # Ensure subdirectories exist in the destination
+
+    os.makedirs(target_root, exist_ok=True)
+
+    # Copy and overwrite files, but do NOT remove existing files
+
+    for file in files:
+      source_file = os.path.join(root, file)
+      destination_file = os.path.join(target_root, file)
+      shutil.copy2(source_file, destination_file)
+      copied_files.append(destination_file)
+
+  return copied_files
+
+#-------------------------------------------------------------------------
+# process_directory
+#-------------------------------------------------------------------------
+# Process only the files that were actually copied using Jinja2 templates
+
+def process_directory(copied_files, context):
+
+  env = Environment(undefined=StrictUndefined,trim_blocks=True)
+
+  for file_path in copied_files:
+    with open(file_path, 'r') as file:
+      content = file.read()
+
+    template = env.from_string(content)
+
+    try:
+      rendered_content = template.render(context)
+    except Exception as e:
+      print(f"Error processing {file_path}: {e}", file=sys.stderr)
+      sys.exit(1)
+
+    with open(file_path, 'w') as file:
+      file.write(rendered_content)
+
+#-------------------------------------------------------------------------
+# generate_run_flow_script
+#-------------------------------------------------------------------------
+# Generate a 'run-flow' Bash script in the current working directory
+
+def generate_run_flow_script(steps):
+  script_path = os.path.abspath("run-flow")
+
+  # Create the script content
+
+  script_content = "#!/usr/bin/env bash\n\n"
+
+  # Add step execution lines
+
+  for step in steps:
+    script_content += f"./{step}/run\n"
+
+  script_content += "\n";
+
+  # Write to the file
+
+  with open(script_path, "w") as f:
+    f.write(script_content)
+
+  # Make the script executable
+
+  os.chmod(script_path, 0o755)
+
+  print(f"Generated run-flow script")
+
+#-------------------------------------------------------------------------
+# main
+#-------------------------------------------------------------------------
+
+def main():
+
+  # Parse arguments and load YAML data
+
+  yaml_path, steps, context = parse_command_line_args()
+
+  # Determine full paths of step directories
+
+  step_paths = get_step_paths(yaml_path, steps)
+
+  # Track all copied files
+
+  all_copied_files = []
+
+  for step, source_path in step_paths.items():
+
+    print(f"Processing step {step} ...")
+
+    # Copy step directory to current working directory
+
+    copied_files = create_directory_copy(source_path, step)
+    all_copied_files.extend( copied_files )
+
+    # Process Jinja2 templates inside the copied directory
+
+    process_directory( all_copied_files, context )
+
+  # Generate the run-flow script
+
+  generate_run_flow_script(steps)
+
+  print("All steps processed successfully!")
+
+if __name__ == "__main__":
+    main()
+
