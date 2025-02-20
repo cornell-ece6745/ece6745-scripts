@@ -65,6 +65,7 @@ def parse_command_line_args():
 
   parser = argparse.ArgumentParser()
   parser.add_argument("yaml_file", help="YAML file with list of steps and template variables.")
+  parser.add_argument("--one-test", help="Only run one test and no evals", action="store_true")
   parser.add_argument("--params", nargs="*", help="Key-value pairs in the format --key=value", default=[])
 
   args, unknown_args = parser.parse_known_args()
@@ -85,6 +86,13 @@ def parse_command_line_args():
   # Merge dictionaries: command-line variables override YAML file variables
 
   final_context = {**yaml_context, **cmd_context}
+
+  # If --one-test is set remove all evals and all but first test
+
+  if args.one_test:
+    final_context.pop( "evals", None )
+    if "tests" in final_context:
+      final_context["tests"] = final_context["tests"][:1]
 
   return args.yaml_file, steps, final_context
 
