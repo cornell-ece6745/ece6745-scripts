@@ -300,6 +300,7 @@ module_load riscv-gnu-toolchain/2022
 
 module_load klayout/0.29.11
 module_load ngspice/44.2
+module_load openram/1.2.48
 
 # ASIC Commercial Tools
 
@@ -307,6 +308,7 @@ module_load synopsys-vcs/2023.12-SP2-1
 module_load synopsys-dc/2023.12-SP5
 module_load cadence-innovus/23.12-s091_1
 module_load synopsys-pt/V-2023.12-SP5
+module_load synopsys-lc/V-2023.12-SP4
 
 #-------------------------------------------------------------------------
 # Environment Variables
