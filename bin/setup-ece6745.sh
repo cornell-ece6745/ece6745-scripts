@@ -300,7 +300,7 @@ module_load riscv-gnu-toolchain/2022
 
 module_load klayout/0.29.11
 module_load ngspice/44.2
-module_load openram/1.2.48
+module_load openram/1.2.48-forked
 
 # ASIC Commercial Tools
 
