@@ -158,9 +158,16 @@ def create_directory_copy(source_dir, destination_dir):
 
 def process_directory(copied_files, context):
 
-  env = Environment(undefined=StrictUndefined,trim_blocks=True)
+  env = Environment(
+    undefined=StrictUndefined,
+    trim_blocks=True,
+    keep_trailing_newline=True,
+  )
 
   for file_path in copied_files:
+
+    # print(f" - {file_path}")
+
     with open(file_path, 'r') as file:
       content = file.read()
 
@@ -219,9 +226,7 @@ def main():
 
   step_paths = get_step_paths(yaml_path, steps)
 
-  # Track all copied files
-
-  all_copied_files = []
+  # Process steps
 
   for step, source_path in step_paths.items():
 
@@ -230,11 +235,10 @@ def main():
     # Copy step directory to current working directory
 
     copied_files = create_directory_copy(source_path, step)
-    all_copied_files.extend( copied_files )
 
     # Process Jinja2 templates inside the copied directory
 
-    process_directory( all_copied_files, context )
+    process_directory( copied_files, context )
 
   # Generate the run-flow script
 
