@@ -307,8 +307,8 @@ module_load openram/1.2.48-forked
 module_load synopsys-vcs/V-2023.12-SP2-1
 module_load synopsys-dc/V-2023.12-SP5
 module_load cadence-innovus/23.12-s091_1
-module_load synopsys-pt/V-2023.12-SP5
-module_load synopsys-lc/V-2023.12-SP4
+module_load synopsys-pt/W-2024.09-SP5
+module_load synopsys-lc/W-2024.09-SP5-3
 
 #-------------------------------------------------------------------------
 # Environment Variables
