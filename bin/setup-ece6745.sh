@@ -294,27 +294,29 @@ module_load venvs/py3.11.9-default
 
 # RISC-V Cross-Compiler
 
-# module_load riscv-gnu-toolchain/2022
+module_load riscv-gnu-toolchain/670-g049b329
 
 # ASIC Open-Source Tools
 
-# module_load klayout/0.29.11
-# module_load ngspice/44.2
-# module_load openram/1.2.48-forked
+module_load klayout/0.30.5
+module_load ngspice/45.2
+module_load openram/1.2.48-forked
 
 # ASIC Commercial Tools
 
-# module_load synopsys-vcs/V-2023.12-SP2-1
-# module_load synopsys-dc/V-2023.12-SP5
-# module_load cadence-innovus/23.12-s091_1
-# module_load synopsys-pt/W-2024.09-SP5
-# module_load synopsys-lc/W-2024.09-SP5-3
+module_load synopsys-vcs/V-2023.12-SP2-1
+module_load synopsys-dc/V-2023.12-SP5
+module_load cadence-innovus/23.12-s091_1
+module_load synopsys-pt/W-2024.09-SP5
+module_load synopsys-lc/W-2024.09-SP5-3
+module_load mentor-calibre/2024.3_16.10
 
 #-------------------------------------------------------------------------
 # Environment Variables
 #-------------------------------------------------------------------------
 
-export ECE6745_STDCELLS="${ECE6745_INSTALL}/adks/freepdk-45nm/stdview"
+export FREEPDK_45NM="${ECE6745_INSTALL}/adks/freepdk-45nm/stdview"
+export TSMC_180NM="${ECE6745_INSTALL}/adks/tsmc-180nm/stdview"
 export CANVAS_API_COURSEID="85471"
 export GITHUB_ORG="cornell-ece6745"
 
