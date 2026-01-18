@@ -259,8 +259,8 @@ chmod 600 ~/.ssh/ece6745-github
 #-------------------------------------------------------------------------
 
 export ECE6745_INSTALL="/classes/ece6745/install"
-export PATH="${ECE6745_INSTALL}/pkgs/modules-5.5.0/bin:${PATH}"
-source "${ECE6745_INSTALL}/pkgs/modules-5.5.0/init/bash"
+export PATH="${ECE6745_INSTALL}/pkgs/modules-5.6.1/bin:${PATH}"
+source "${ECE6745_INSTALL}/pkgs/modules-5.6.1/init/bash"
 
 module use "${ECE6745_INSTALL}/modules"
 
@@ -280,12 +280,12 @@ function module_load
 # RTL Development Tools
 
 module_load ece6745-scripts/0.0
-module_load bash-completion/2.16.0
+module_load bash-completion/2.17.0
 module_load gcc/13.2.1
-module_load gh/2.65.0
-module_load iverilog/12.0
+module_load gh/2.85.0
+module_load iverilog/s20251012
 module_load verilator/5.032
-module_load gtkwave/3.3.121
+module_load gtkwave/3.3.126
 
 # Python Environment
 
@@ -294,28 +294,28 @@ module_load venvs/py3.11.9-default
 
 # RISC-V Cross-Compiler
 
-module_load riscv-gnu-toolchain/2022
+# module_load riscv-gnu-toolchain/2022
 
 # ASIC Open-Source Tools
 
-module_load klayout/0.29.11
-module_load ngspice/44.2
-module_load openram/1.2.48-forked
+# module_load klayout/0.29.11
+# module_load ngspice/44.2
+# module_load openram/1.2.48-forked
 
 # ASIC Commercial Tools
 
-module_load synopsys-vcs/V-2023.12-SP2-1
-module_load synopsys-dc/V-2023.12-SP5
-module_load cadence-innovus/23.12-s091_1
-module_load synopsys-pt/W-2024.09-SP5
-module_load synopsys-lc/W-2024.09-SP5-3
+# module_load synopsys-vcs/V-2023.12-SP2-1
+# module_load synopsys-dc/V-2023.12-SP5
+# module_load cadence-innovus/23.12-s091_1
+# module_load synopsys-pt/W-2024.09-SP5
+# module_load synopsys-lc/W-2024.09-SP5-3
 
 #-------------------------------------------------------------------------
 # Environment Variables
 #-------------------------------------------------------------------------
 
 export ECE6745_STDCELLS="${ECE6745_INSTALL}/adks/freepdk-45nm/stdview"
-export CANVAS_API_COURSEID="72710"
+export CANVAS_API_COURSEID="85471"
 export GITHUB_ORG="cornell-ece6745"
 
 #-------------------------------------------------------------------------

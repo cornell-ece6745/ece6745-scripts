@@ -1,7 +1,7 @@
 #!/bin/bash
 #=========================================================================
-# riscv32-objdump
+# tinyrv2-objdump
 #=========================================================================
 
-riscv32-unknown-elf-objdump -dC --no-show-raw-insn -Mno-aliases -Mnumeric $@
+riscv64-unknown-elf-objdump -dC --no-show-raw-insn -Mno-aliases -Mnumeric $@
 
