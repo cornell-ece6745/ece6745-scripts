@@ -315,10 +315,13 @@ module_load mentor-calibre/2024.3_16.10
 # Copy klayoutrc for TinyFlow 180nm PDK
 #-------------------------------------------------------------------------
 
-print "  - Setting up klayoutrc for TinyFlow 180nm PDK"
+print "  - Setting up TinyFlow 180nm PDK"
 
 mkdir -p ${HOME}/.klayout
 cp ${ECE6745_INSTALL}/adks/tinyflow-180nm/klayoutrc ${HOME}/.klayout
+
+mkdir -p ${HOME}/.klayout/tech
+cp ${ECE6745_INSTALL}/adks/tinyflow-180nm/tinyflow-180nm.lyt ${HOME}/.klayout/tech
 
 #-------------------------------------------------------------------------
 # Environment Variables
