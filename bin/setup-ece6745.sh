@@ -315,6 +315,7 @@ module_load mentor-calibre/2024.3_16.10
 # Environment Variables
 #-------------------------------------------------------------------------
 
+export SKYWATER_130NM_SPICE="/classes/ece6745/install/adks/skywater-130nm/download/sky130A"
 export FREEPDK_45NM="${ECE6745_INSTALL}/adks/freepdk-45nm/stdview"
 export TSMC_180NM="${ECE6745_INSTALL}/adks/tsmc-180nm/stdview"
 export CANVAS_API_COURSEID="85471"
