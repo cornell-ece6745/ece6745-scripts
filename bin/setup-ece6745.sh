@@ -312,8 +312,10 @@ module_load synopsys-lc/W-2024.09-SP5-3
 module_load mentor-calibre/2024.3_16.10
 
 #-------------------------------------------------------------------------
-# Copy klayoutrc for TinyFlow 180nm pdk
+# Copy klayoutrc for TinyFlow 180nm PDK
 #-------------------------------------------------------------------------
+
+print "  - Setting up klayoutrc for TinyFlow 180nm PDK"
 
 mkdir -p ${HOME}/.klayout
 cp ${ECE6745_INSTALL}/adks/tinyflow-180nm/klayoutrc ${HOME}/.klayout
@@ -321,6 +323,8 @@ cp ${ECE6745_INSTALL}/adks/tinyflow-180nm/klayoutrc ${HOME}/.klayout
 #-------------------------------------------------------------------------
 # Environment Variables
 #-------------------------------------------------------------------------
+
+print "  - Setting up environment variables"
 
 export SKYWATER_130NM_SPICE="/classes/ece6745/install/adks/skywater-130nm/download/sky130A"
 export FREEPDK_45NM="${ECE6745_INSTALL}/adks/freepdk-45nm/stdview"
