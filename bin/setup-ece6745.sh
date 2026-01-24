@@ -193,6 +193,7 @@ fi
 
 case "$(hostname)" in
   ecelinux-*.ece.cornell.edu)       server_class="ecelinux" ;;
+  brg-*.ece.cornell.edu)            server_class="ecelinux" ;;
   # en-ec-ph314-*.ece.cornell.edu)  server_class="ecelinux" ;;
   *)                                server_class="unknown"  ;;
 esac
