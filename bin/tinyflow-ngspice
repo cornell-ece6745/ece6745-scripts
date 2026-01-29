@@ -29,7 +29,7 @@ class TinyFlowSchema:
     'INVX1': {'A'},
     'NAND2X1': {'A', 'B'},
     'NOR2X1': {'A', 'B'},
-    'AOI21X1': {'A', 'B', 'S'},
+    'AOI21X1': {'A', 'B', 'C'},
     'TIEHI': set(),
     'TIELO': set(),
   }
@@ -291,8 +291,8 @@ class TinyFlowNgspice:
       # Y = NOT(A OR B)
       initial_output_val = not (initial_values['A'] or initial_values['B'])
     elif cell == 'AOI21X1':
-      # Y = NOT((A AND B) OR S)
-      initial_output_val = not ((initial_values['A'] and initial_values['B']) or initial_values['S'])
+      # Y = NOT((A AND B) OR C)
+      initial_output_val = not ((initial_values['A'] and initial_values['B']) or initial_values['C'])
     elif cell == 'TIEHI':
       initial_output_val = True
     elif cell == 'TIELO':
