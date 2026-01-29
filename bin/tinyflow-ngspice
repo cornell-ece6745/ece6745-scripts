@@ -1,0 +1,573 @@
+#!/usr/bin/env python3
+#=========================================================================
+# Wrapper Python script for ngspice simulation and characterization
+#=========================================================================
+# Authors : Parker Schless
+# Date    : January 2026
+# 
+# Note: Claude Code was used to help generate this script
+
+from datetime import datetime
+from pathlib import Path
+from schema import Schema, And, Or, Optional, Regex, SchemaError
+import argparse
+import jinja2
+import matplotlib
+matplotlib.use('Agg')  # Use non-interactive backend before importing pyplot
+import matplotlib.pyplot as plt
+import numpy as np
+import os
+import re
+import subprocess
+import sys
+
+class TinyFlowSchema:
+  """Schema validator for TinyFlow ngspice arguments."""
+
+  CELL_CHOICES = ['INVX1', 'NAND2X1', 'NOR2X1', 'AOI21X1', 'TIEHI', 'TIELO']
+  REQUIRED_PINS = {
+    'INVX1': {'A'},
+    'NAND2X1': {'A', 'B'},
+    'NOR2X1': {'A', 'B'},
+    'AOI21X1': {'A', 'B', 'S'},
+    'TIEHI': set(),
+    'TIELO': set(),
+  }
+  PIN_SPEC_PATTERN = r'^([A-Za-z_][A-Za-z0-9_]*):([01])(-[01])*$'
+  CLOAD_PATTERN = r'^(\d+\.?\d*|\.\d+)(a|f|p|n|u|m)?$'
+
+  def __init__(
+    self
+  ):
+    self._schema = Schema(And(
+      {
+        'cell': And(str, lambda c: c in self.CELL_CHOICES,
+                    error=f"invalid cell type, must be one of {self.CELL_CHOICES}"),
+        'cload': And(str, Regex(self.CLOAD_PATTERN),
+                     error='invalid cload, expected decimal with optional unit suffix (a, f, p, n, u, m)'),
+        'inputs': str,
+        Optional('rcx'): bool
+      },
+      self._validate_inputs_for_cell
+    ))
+
+  def _validate_inputs_for_cell(
+    self,
+    data
+  ):
+    """Validate inputs string format and required pins for the cell type."""
+    cell = data['cell']
+    inputs_str = data['inputs']
+    expected_pins = self.REQUIRED_PINS.get(cell, set())
+
+    # Handle cells with no inputs (TIEHI/TIELO)
+    if not expected_pins:
+      if inputs_str and inputs_str.strip():
+        raise SchemaError(f"{cell} requires no input pins")
+      return data
+
+    # Cells that require inputs
+    if not inputs_str or not inputs_str.strip():
+      raise SchemaError(f"{cell} requires input pins {sorted(expected_pins)}")
+
+    # Validate each pin specification
+    provided_pins = set()
+    pin_schema = Schema(Regex(self.PIN_SPEC_PATTERN))
+
+    for pin_spec in inputs_str.split(';'):
+      try:
+        pin_schema.validate(pin_spec)
+      except SchemaError:
+        raise SchemaError(f"malformed input '{pin_spec}', expected format 'PIN:val-val-...' where val is 0 or 1, pin specs separated by ';'")
+      pin = pin_spec.split(':')[0]
+      if pin in provided_pins:
+        raise SchemaError(f"duplicate pin '{pin}' in inputs")
+      provided_pins.add(pin)
+
+    # Check required pins match provided pins
+    if provided_pins != expected_pins:
+      missing = expected_pins - provided_pins
+      extra = provided_pins - expected_pins
+      if missing:
+        raise SchemaError(f"{cell} missing pins: {', '.join(sorted(missing))}")
+      if extra:
+        raise SchemaError(f"{cell} unexpected pins: {', '.join(sorted(extra))}")
+
+    # Validate all pins have equal number of values
+    step_counts = []
+    for pin_spec in inputs_str.split(';'):
+      sequence = pin_spec.split(':')[1]
+      values = sequence.split('-')
+      step_counts.append(len(values))
+    if len(set(step_counts)) > 1:
+      raise SchemaError("all input pins must have equal number of values")
+
+    return data
+
+  def validate(
+    self,
+    args
+  ):
+    """Validate argparse Namespace against schema."""
+    return self._schema.validate(vars(args))
+
+class TinyFlowNgspice:
+  """TinyFlow ngspice simulation and characterization wrapper."""
+
+  def __init__(
+    self
+  ):
+    self.args = None
+    self.tb_data = {}
+    self.output_lines = []
+
+  def _log(
+    self,
+    line=''
+  ):
+    """Print line to console and store for file output."""
+    print(line)
+    self.output_lines.append(line)
+
+  def parse_args(
+    self
+  ):
+    """Parse command line arguments."""
+
+    parser = argparse.ArgumentParser(
+      description='TinyFlow ngspice simulation and characterization wrapper'
+    )
+
+    parser.add_argument(
+      '--cell',
+      type=str,
+      required=True,
+      choices=TinyFlowSchema.CELL_CHOICES,
+      help='Type of standard cell to simulate'
+    )
+
+    parser.add_argument(
+      '--cload',
+      type=str,
+      default='0f',
+      help='Load capacitance with units (e.g., "10f" for 10 femtofarads)'
+    )
+
+    parser.add_argument(
+      '--rcx',
+      action='store_true',
+      help='Use RCX netlist for simulation'
+    )
+
+    parser.add_argument(
+      '--inputs',
+      type=str,
+      default='',
+      help='Input pin transitions'
+    )
+
+    self.args = parser.parse_args()
+
+    # Validate arguments against schema
+    try:
+      TinyFlowSchema().validate(self.args)
+    except SchemaError as e:
+      print(f"Error: {e}", file=sys.stderr)
+      sys.exit(1)
+
+    # Set testbench data
+    self.tb_data['date'] = datetime.now().strftime('%B %Y')
+    self.tb_data['cell'] = self.args.cell
+    self.tb_data['cload'] = self.args.cload
+    self.tb_data['output_basename'] = self._get_output_basename()
+
+    # Create output directory
+    self.output_dir = Path.cwd() / self.tb_data['output_basename']
+    self.output_dir.mkdir(exist_ok=True)
+    self.tb_data['output_dir'] = str(self.output_dir)
+
+    # Parse inputs string and generate stimuli
+    (
+        self.tb_data['input_stimuli'],
+        self.tb_data['sim_time'],
+        self.tb_data['initial_output'],
+    ) = self._parse_inputs()
+
+  def _get_output_basename(
+    self
+  ):
+    """Convert inputs string to filename-safe suffix with leading dash.
+
+    Example: 'A:0-1-0;B:1-0-1' -> '-A_0_1_0_B_1_0_1'
+    Returns empty string if no inputs.
+    """
+
+    if not self.args.inputs:
+      basename_inputs_str = ''
+    else:
+      basename_inputs_str = '-' + self.args.inputs.replace('-', '_').replace(':', '_').replace(';', '-')
+    
+    return (
+      f'{self.args.cell}-'
+      f'{self.args.cload}'
+      f'{"-rcx" if self.args.rcx else ""}'
+      f'{basename_inputs_str}'
+    )
+
+  def _parse_inputs(
+    self
+  ):
+    """
+    Parse validated inputs string and generate PWL stimuli dictionary and sim time.
+
+    Note: Input validation is performed by _validate_args() before this method is called.
+
+    Format: "A:0-1-0;B:0-1-1" where:
+    - Character before ':' is the input pin name
+    - Values after ':' separated by '-' are the voltage sequence (0 or 1)
+    - Each step is 2ns apart
+
+    Returns:
+      tuple: (input_stimuli dict, sim_time string, initial_output string)
+    """
+
+    cell = self.args.cell
+
+    # Handle TIEHI/TIELO (no inputs)
+    if cell in ('TIEHI', 'TIELO'):
+      initial_output = 'SUPPLY' if cell == 'TIEHI' else '0'
+      return {}, '2ns', initial_output
+
+    input_stimuli = {}
+    step_counts = []
+    initial_values = {}  # Store first value of each input for output calculation
+
+    # Parse each input pin's sequence (already validated by _validate_args)
+    for pin_spec in self.args.inputs.split(';'):
+      pin, sequence = pin_spec.split(':')
+      values = sequence.split('-')
+
+      initial_values[pin] = int(values[0])  # Store first value
+      step_counts.append(len(values))
+
+      pwl_parts = []
+      prev_voltage = None
+
+      for i, val in enumerate(values):
+        voltage = 'SUPPLY' if val == '1' else '0'
+        time_ns = i * 2
+        time_str = f'{time_ns}n' if i > 0 else '0'
+
+        if i == 0:
+          # First value: set initial voltage at t=0
+          pwl_parts.append(f'0 {voltage}')
+        elif prev_voltage != voltage:
+          # Transition: add both old and new voltage at same timestep
+          pwl_parts.append(f'{time_str} {prev_voltage}')
+          pwl_parts.append(f'{time_str} {voltage}')
+        else:
+          # No transition: add hold point at this timestep
+          pwl_parts.append(f'{time_str} {voltage}')
+
+        prev_voltage = voltage
+
+      # Add final hold point at end of simulation window
+      final_time_ns = len(values) * 2
+      pwl_parts.append(f'{final_time_ns}n {prev_voltage}')
+
+      input_stimuli[pin] = ' '.join(pwl_parts)
+
+    # Sim time: 2ns * number of values (includes margin after last transition)
+    sim_time = f'{step_counts[0] * 2}ns'
+
+    # Calculate initial output based on cell logic and first input values
+    if cell == 'INVX1':
+      # Y = NOT(A)
+      initial_output_val = not initial_values['A']
+    elif cell == 'NAND2X1':
+      # Y = NOT(A AND B)
+      initial_output_val = not (initial_values['A'] and initial_values['B'])
+    elif cell == 'NOR2X1':
+      # Y = NOT(A OR B)
+      initial_output_val = not (initial_values['A'] or initial_values['B'])
+    elif cell == 'AOI21X1':
+      # Y = NOT((A AND B) OR S)
+      initial_output_val = not ((initial_values['A'] and initial_values['B']) or initial_values['S'])
+    elif cell == 'TIEHI':
+      initial_output_val = True
+    elif cell == 'TIELO':
+      initial_output_val = False
+    else:
+      initial_output_val = False  # Default to low
+
+    initial_output = 'SUPPLY' if initial_output_val else '0'
+
+    return input_stimuli, sim_time, initial_output
+
+  def convert_cell_lib(
+    self
+  ):
+    """Convert standard cell library to ngspice format with SKY130 models"""
+
+    # Get cell spice lib based on rcx argument in user's repo
+    file_name = 'stdcells-rcx' if self.args.rcx else 'stdcells'
+    input_file = Path.cwd().parent / f'{file_name}.sp'
+
+    # Check if input file exists
+    if not input_file.exists():
+      print(f"Error: file not found: {input_file}", file=sys.stderr)
+      sys.exit(1)
+
+    # Read input file
+    content = input_file.read_text()
+
+    # Convert transistor models to SKY130 names
+    content = re.sub(r'\bPMOS\b', 'sky130_fd_pr__pfet_01v8', content)
+    content = re.sub(r'\bNMOS\b', 'sky130_fd_pr__nfet_01v8', content)
+    content = re.sub(r'\bM\$', 'XM$', content)
+    content = re.sub(r'\bM_P', 'XM_P', content)
+    content = re.sub(r'\bM_N', 'XM_N', content)
+
+    # Add library reference after "// Date" line
+    skywater_spice = os.environ.get('SKYWATER_130NM_SPICE', '')
+    lib_lines = f"\n.lib '{skywater_spice}/libs.tech/ngspice/sky130.lib.spice' ff\n.temp 125"
+    content = re.sub(r'(// Date[^\n]*\n)', r'\1' + lib_lines + '\n', content)
+
+    # Output cell lib to build directory
+    output_file = (Path.cwd() / f'{file_name}-sky130.sp').resolve()
+    output_file.write_text(content)
+
+    self.tb_data['cell_lib_path'] = str(output_file)
+
+  def gen_spice_tb(
+    self
+  ):
+    """Generate ngspice testbench netlist for the specified cell."""
+
+    # Load testbench template
+    template_path = Path(__file__).parent.parent / 'share/tinyflow-ngspice/tinyflow-ngspice-tb-tmpl.sp'
+    if not template_path.exists():
+      print(f"Error: template not found: {template_path}", file=sys.stderr)
+      sys.exit(1)
+
+    template_content = template_path.read_text()
+    template = jinja2.Template(template_content)
+
+    # Render template with testbench data
+    rendered = template.render(self.tb_data)
+
+    # Output testbench spice to build directory
+    output_file = self.output_dir / f'{self.tb_data["output_basename"]}-tb.sp'
+    output_file.write_text(rendered)
+
+    self.tb_data['tb_path'] = str(output_file)
+
+  def run_simulation(
+    self
+  ):
+    """Run ngspice simulation and process results."""
+
+    # Invoke ngspice with the generated testbench
+    result = subprocess.run(
+      ['ngspice', self.tb_data['tb_path']],
+      capture_output=True,
+      text=True
+    )
+
+    output = result.stdout + result.stderr
+
+    # Split output by "Measuring delays for input pin X" sections
+    sections = re.split(r'Measuring delays for input pin (\w+)', output)
+
+    # Read CSV waveform data and print transitions
+    csv_file = self.output_dir / f'{self.tb_data["output_basename"]}.csv'
+    if csv_file.exists():
+      self._print_transitions(csv_file)
+
+    # sections[0] is before first match, then alternates: pin, content, pin, content...
+    self._log("\nMeasured delays:")
+    for i in range(1, len(sections), 2):
+      pin = sections[i]
+      content = sections[i + 1] if i + 1 < len(sections) else ''
+
+      # Extract t_pdf value (before "targ")
+      t_pdf_match = re.search(r't_pdf\s*=\s*([\d.e+-]+)\s*targ', content)
+      t_pdr_match = re.search(r't_pdr\s*=\s*([\d.e+-]+)\s*targ', content)
+
+      # Determine t_pdf result
+      if t_pdf_match and float(t_pdf_match.group(1)) >= 0:
+        t_pdf_str = f'{t_pdf_match.group(1)} s'
+      else:
+        t_pdf_str = 'not captured'
+
+      # Determine t_pdr result
+      if t_pdr_match and float(t_pdr_match.group(1)) >= 0:
+        t_pdr_str = f'{t_pdr_match.group(1)} s'
+      else:
+        t_pdr_str = 'not captured'
+
+      self._log(f"{pin}->Y:")
+      self._log(f"  t_pdf = {t_pdf_str}")
+      self._log(f"  t_pdr = {t_pdr_str}")
+    self._log()
+
+    # Write results to text file
+    results_file = self.output_dir / f'{self.tb_data["output_basename"]}.txt'
+    results_file.write_text('\n'.join(self.output_lines))
+
+  def _print_transitions(
+    self,
+    csv_file
+  ):
+    """Read CSV waveform data and print signal transitions."""
+
+    # Read the header row to get signal names
+    with open(csv_file, 'r') as f:
+      header_line = f.readline().strip()
+
+    # Parse column names (space or tab separated)
+    col_names = header_line.split()
+
+    # Load all data (skip header row)
+    data = np.loadtxt(csv_file, skiprows=1, ndmin=2)
+
+    # Parse column pairs: (time, signal_data)
+    # Columns are organized as: time1 data1 time2 data2 ...
+    if data.size == 0:
+      print("Warning: no waveform data found", file=sys.stderr)
+      return
+    num_cols = data.shape[1]
+    num_signals = num_cols // 2
+
+    # Extract signal names and data
+    signals = {}
+    for i in range(num_signals):
+      time_col_idx = i * 2
+      data_col_idx = i * 2 + 1
+
+      time = data[:, time_col_idx]
+      signal_data = data[:, data_col_idx]
+
+      # Get signal name from header (data column name)
+      if data_col_idx < len(col_names):
+        signal_name = col_names[data_col_idx]
+        # Clean up signal name (remove v() wrapper if present)
+        signal_name = signal_name.replace('v(', '').replace(')', '')
+        signal_name = signal_name.replace('V(', '').replace(')', '')
+      else:
+        signal_name = f'Signal{i+1}'
+
+      signals[signal_name] = (time, signal_data)
+
+    # Determine sample times (1ns after each 2ns step boundary to capture settled values)
+    # Get number of steps from sim_time
+    sim_time_ns = int(self.tb_data['sim_time'].replace('ns', ''))
+    num_steps = sim_time_ns // 2
+    sample_times = [(i * 2 + 1) * 1e-9 for i in range(num_steps)]  # 1ns, 3ns, 5ns, ...
+
+    # Voltage threshold for logic level (half of 1.8V supply)
+    threshold = 0.9
+
+    # Sample each signal and build transition string
+    self._log("\nSignal transitions:")
+    for signal_name, (time, signal_data) in signals.items():
+      values = []
+      for sample_time in sample_times:
+        # Find the closest time index
+        idx = np.searchsorted(time, sample_time)
+        if idx >= len(signal_data):
+          idx = len(signal_data) - 1
+        voltage = signal_data[idx]
+        logic_val = '1' if voltage > threshold else '0'
+        values.append(logic_val)
+
+      transition_str = '-'.join(values)
+      self._log(f"  {signal_name}: {transition_str}")
+
+  def plot_waveforms(
+    self
+  ):
+    """Plot and save waveforms from ngspice CSV output using stacked subplots."""
+
+    csv_file = self.output_dir / f'{self.tb_data["output_basename"]}.csv'
+
+    if not csv_file.exists():
+      print(f"Error: waveform file not found: {csv_file}", file=sys.stderr)
+      return
+
+    # Read the header row to get signal names
+    with open(csv_file, 'r') as f:
+      header_line = f.readline().strip()
+
+    # Parse column names (space or tab separated)
+    col_names = header_line.split()
+
+    # Load all data (skip header row)
+    data = np.loadtxt(csv_file, skiprows=1)
+
+    # Parse column pairs: (time, signal_data)
+    # Columns are organized as: time1 data1 time2 data2 ...
+    num_cols = data.shape[1]
+    num_signals = num_cols // 2
+
+    # Extract signal names and data
+    signals = []
+    signal_names = []
+
+    for i in range(num_signals):
+      time_col_idx = i * 2
+      data_col_idx = i * 2 + 1
+
+      time = data[:, time_col_idx]
+      signal_data = data[:, data_col_idx]
+
+      # Get signal name from header (data column name)
+      if data_col_idx < len(col_names):
+        signal_name = col_names[data_col_idx]
+        # Clean up signal name (remove v() wrapper if present)
+        signal_name = signal_name.replace('v(', '').replace(')', '')
+        signal_name = signal_name.replace('V(', '').replace(')', '')
+      else:
+        signal_name = f'Signal {i+1}'
+
+      signals.append((time, signal_data))
+      signal_names.append(signal_name)
+
+    # Create figure with stacked subplots
+    fig, axes = plt.subplots(num_signals, 1, figsize=(10, 2*num_signals), sharex=True)
+
+    # Handle single subplot case
+    if num_signals == 1:
+      axes = [axes]
+
+    # Plot each signal
+    for ax, (time, signal_data), name in zip(axes, signals, signal_names):
+      ax.plot(time * 1e9, signal_data, linewidth=2, color='blue')  # Convert time to ns
+      ax.set_ylabel(f'{name}\n(V)', fontsize=10)
+      ax.grid(True, alpha=0.3)
+      ax.set_ylim([-0.2, 2.0])
+
+      # Add horizontal reference lines at 0V and 1.8V
+      ax.axhline(y=0, color='gray', linestyle='--', linewidth=0.5, alpha=0.5)
+      ax.axhline(y=1.8, color='gray', linestyle='--', linewidth=0.5, alpha=0.5)
+
+    # Label the bottom plot x-axis
+    axes[-1].set_xlabel('Time (ns)', fontsize=10)
+
+    # Set title
+    title = f'{self.args.cell} Waveforms'
+    fig.suptitle(title, fontsize=14, fontweight='bold')
+
+    # Adjust layout and save
+    plt.tight_layout()
+    output_file = self.output_dir / f'{self.tb_data["output_basename"]}.png'
+    plt.savefig(output_file, dpi=150, bbox_inches='tight')
+    plt.close(fig)
+
+if __name__ == '__main__':
+  tinyflow_ngspice = TinyFlowNgspice()
+  tinyflow_ngspice.parse_args()
+  tinyflow_ngspice.convert_cell_lib()
+  tinyflow_ngspice.gen_spice_tb()
+  tinyflow_ngspice.run_simulation()
+  tinyflow_ngspice.plot_waveforms()

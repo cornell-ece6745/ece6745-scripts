@@ -13,9 +13,13 @@ install_exes = \
   $(src_dir)/bin/module-venv-remove \
   $(src_dir)/bin/pyhflow \
   $(src_dir)/bin/tinyrv2-objdump \
+  $(src_dir)/bin/tinyflow-ngspice \
 
 install_etcs = \
   $(src_dir)/etc/ece6745-git-config \
+
+install_shares = \
+  $(src_dir)/share/tinyflow-ngspice/tinyflow-ngspice-tb-tmpl.sp \
 
 #-------------------------------------------------------------------------
 # Basic setup
@@ -64,12 +68,14 @@ endif
 
 install_exes_dir := $(DESTDIR)/bin
 install_etcs_dir := $(DESTDIR)/etc
+install_shares_dir := $(DESTDIR)/share
 install_templates_dir := $(DESTDIR)/bin/templates
 
 MKINSTALLDIRS := $(scripts_dir)/mk-install-dirs.sh
 INSTALL       := @INSTALL@
 INSTALL_HDR   := $(INSTALL) -m 444
 INSTALL_ETC   := $(INSTALL) -m 444
+INSTALL_SHARE := $(INSTALL) -m 444
 INSTALL_LIB   := $(INSTALL) -m 644
 INSTALL_EXE   := $(INSTALL) -m 555
 STOW          := @stow@
@@ -93,7 +99,13 @@ install-etcs : $(install_etcs)
 	$(INSTALL_ETC) $(src_dir)/etc/ece6745-git-config \
                  $(DESTDIR)/etc/gitconfig.d
 
-install : install-exes install-etcs
+install-shares : $(install_shares)
+	$(MKINSTALLDIRS) $(DESTDIR)/share
+	$(MKINSTALLDIRS) $(DESTDIR)/share/tinyflow-ngspice
+	$(INSTALL_SHARE) $(src_dir)/share/tinyflow-ngspice/tinyflow-ngspice-tb-tmpl.sp \
+                   $(DESTDIR)/share/tinyflow-ngspice
+
+install : install-exes install-etcs install-shares
 ifeq ($(enable_stow),yes)
 	$(MKINSTALLDIRS) $(stow_pkg_dir)
 	cd $(stow_pkg_dir) && \
@@ -101,7 +113,7 @@ ifeq ($(enable_stow),yes)
     $(STOW) $(project_name)-$(project_ver)
 endif
 
-.PHONY : install install-exes install-etcs install-templates
+.PHONY : install install-exes install-etcs install-shares install-templates
 
 #-------------------------------------------------------------------------
 # Regenerate configure information
@@ -137,6 +149,7 @@ dist_files = \
   Makefile.in \
   bin \
   etc \
+  share \
   scripts \
 
 dist_dir := $(project_name)-$(project_ver)
