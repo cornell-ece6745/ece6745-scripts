@@ -9,7 +9,7 @@
 
 from datetime import datetime
 from pathlib import Path
-from schema import Schema, And, Or, Optional, Regex, SchemaError
+from schema import Schema, And, Or, Regex, SchemaError
 import argparse
 import jinja2
 import matplotlib
@@ -46,10 +46,21 @@ class TinyFlowSchema:
         'cload': And(str, Regex(self.CLOAD_PATTERN),
                      error='invalid cload, expected decimal with optional unit suffix (a, f, p, n, u, m)'),
         'inputs': str,
-        Optional('rcx'): bool
+        'spice': And(str, self._validate_spice_file,
+                     error='spice file does not exist')
       },
       self._validate_inputs_for_cell
     ))
+
+  def _validate_spice_file(
+    self,
+    spice_path
+  ):
+    """Validate that the spice file exists."""
+    path = Path(spice_path)
+    if not path.is_absolute():
+      path = Path.cwd() / path
+    return path.exists()
 
   def _validate_inputs_for_cell(
     self,
@@ -154,9 +165,10 @@ class TinyFlowNgspice:
     )
 
     parser.add_argument(
-      '--rcx',
-      action='store_true',
-      help='Use RCX netlist for simulation'
+      '--spice',
+      type=str,
+      required=True,
+      help='Path to spice netlist file (absolute or relative to cwd)'
     )
 
     parser.add_argument(
@@ -206,11 +218,14 @@ class TinyFlowNgspice:
       basename_inputs_str = ''
     else:
       basename_inputs_str = '-' + self.args.inputs.replace('-', '_').replace(':', '_').replace(';', '-')
-    
+
+    # Get spice file stem (filename without extension)
+    spice_stem = Path(self.args.spice).stem
+
     return (
       f'{self.args.cell}-'
-      f'{self.args.cload}'
-      f'{"-rcx" if self.args.rcx else ""}'
+      f'{self.args.cload}-'
+      f'{spice_stem}'
       f'{basename_inputs_str}'
     )
 
@@ -309,14 +324,10 @@ class TinyFlowNgspice:
   ):
     """Convert standard cell library to ngspice format with SKY130 models"""
 
-    # Get cell spice lib based on rcx argument in user's repo
-    file_name = 'stdcells-rcx' if self.args.rcx else 'stdcells'
-    input_file = Path.cwd().parent / f'{file_name}.sp'
-
-    # Check if input file exists
-    if not input_file.exists():
-      print(f"Error: file not found: {input_file}", file=sys.stderr)
-      sys.exit(1)
+    # Get cell spice lib from user-specified path
+    input_file = Path(self.args.spice)
+    if not input_file.is_absolute():
+      input_file = Path.cwd() / input_file
 
     # Read input file
     content = input_file.read_text()
@@ -334,7 +345,8 @@ class TinyFlowNgspice:
     content = re.sub(r'(// Date[^\n]*\n)', r'\1' + lib_lines + '\n', content)
 
     # Output cell lib to build directory
-    output_file = (Path.cwd() / f'{file_name}-sky130.sp').resolve()
+    spice_stem = Path(self.args.spice).stem
+    output_file = (Path.cwd() / f'{spice_stem}-sky130.sp').resolve()
     output_file.write_text(content)
 
     self.tb_data['cell_lib_path'] = str(output_file)
