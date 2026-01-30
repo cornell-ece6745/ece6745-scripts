@@ -1,0 +1,82 @@
+#!/usr/bin/env python3
+#=========================================================================
+# Wrapper script for running batch LVS on stdcells.gds using KLayout
+#=========================================================================
+# Authors : Vayun Tiwari
+# Date    : January 2026
+
+import subprocess
+import sys
+import os
+from pathlib import Path
+
+# Fixed paths as specified
+INPUT_GDS = "../stdcells.gds"
+SCHEMATIC = "../stdcells.sp"
+OUTPUT_DIR = "./lvs_results/"
+EXTRACTION_DIR = "./rcx-results/"
+
+# Get the directory where this script is located
+SCRIPT_DIR = Path(__file__).parent.absolute()
+BATCH_LVS_RB = SCRIPT_DIR / "../share/tinyflow-batch-drc/batch-lvs.rb"
+LVS_DECK = SCRIPT_DIR / "batch-cell-lvs.lylvs"
+
+def main():
+    # Check if batch-lvs.rb exists
+    if not BATCH_LVS_RB.exists():
+        print(f"Error: batch-lvs.rb not found at {BATCH_LVS_RB}", file=sys.stderr)
+        sys.exit(1)
+    
+    # Check if input GDS exists (relative to current working directory)
+    input_path = Path(INPUT_GDS).resolve()
+    if not input_path.exists():
+        print(f"Error: Input GDS file not found at {input_path}", file=sys.stderr)
+        sys.exit(1)
+    
+    # Check if schematic exists (relative to current working directory)
+    schematic_path = Path(SCHEMATIC).resolve()
+    if not schematic_path.exists():
+        print(f"Error: Schematic file/directory not found at {schematic_path}", file=sys.stderr)
+        sys.exit(1)
+    
+    # Check if LVS deck exists
+    if not LVS_DECK.exists():
+        print(f"Error: LVS rule deck not found at {LVS_DECK}", file=sys.stderr)
+        sys.exit(1)
+    
+    # Get klayout command - check environment variable first (like batch-lvs.rb does)
+    # Fallback to the ECE6745 installation path if not in PATH
+    klayout_cmd = os.environ.get('KLAYOUT', 'klayout')
+    klayout_ece6745_path = '/classes/ece6745/install/pkgs/klayout-0.30.5/bin/klayout'
+    
+    # Check if klayout is available in PATH, otherwise use ECE6745 path
+    if klayout_cmd == 'klayout':
+        import shutil
+        if not shutil.which('klayout') and os.path.exists(klayout_ece6745_path):
+            klayout_cmd = klayout_ece6745_path
+    
+    # Build the klayout command
+    cmd = [
+        klayout_cmd,
+        "-b",
+        "-r", str(BATCH_LVS_RB),
+        "-rd", f"input={input_path}",
+        "-rd", f"schematic={schematic_path}",
+        "-rd", f"lvs={LVS_DECK}",
+        "-rd", f"output_dir={OUTPUT_DIR}",
+        "-rd", f"extraction_dir={EXTRACTION_DIR}"
+    ]
+    
+    # Run the command
+    try:
+        result = subprocess.run(cmd, check=False)
+        sys.exit(result.returncode)
+    except FileNotFoundError:
+        print("Error: 'klayout' command not found. Make sure KLayout is installed and in your PATH.", file=sys.stderr)
+        sys.exit(1)
+    except Exception as e:
+        print(f"Error running klayout: {e}", file=sys.stderr)
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()

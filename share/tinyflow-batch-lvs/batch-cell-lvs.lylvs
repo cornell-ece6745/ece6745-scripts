@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="utf-8"?>
+<klayout-macro>
+ <description/>
+ <version/>
+ <category>lvs</category>
+ <prolog/>
+ <epilog/>
+ <doc/>
+ <autorun>false</autorun>
+ <autorun-early>false</autorun-early>
+ <priority>0</priority>
+ <shortcut/>
+ <show-in-menu>true</show-in-menu>
+ <group-name>lvs_scripts</group-name>
+ <menu-path>tools_menu.lvs.end</menu-path>
+ <interpreter>dsl</interpreter>
+ <dsl-interpreter-name>lvs-dsl-xml</dsl-interpreter-name>
+ <text>#=========================================================================
+# TinyFlow Layout vs. Schematic Rule Deck for Standard Cells
+# Allows for batch processing
+# 
+#=========================================================================
+# Authors : Vayun Tiwari
+# Date    : December 18th, 2025
+
+
+source($input, $top)
+schematic($schematic)
+
+# enable hierarchical mode
+deep
+
+# produce LVS report
+report_lvs($report)
+
+# extract Spice schematic to target file
+target_netlist($target, write_spice, "Extracted by KLayout")
+
+# DRAWING LAYERS ########################################
+nwell       = input(2 , 0)
+active      = input(3 , 0)
+psel        = input(4 , 0)
+nsel        = input(5 , 0)
+poly        = input(6 , 0)
+contact     = input(7 , 0)
+metal1      = input(8 , 0)
+via12       = input(9 , 0)
+metal2      = input(10, 0)
+via23       = input(11, 0)
+metal3      = input(12, 0)
+via34       = input(13, 0)
+metal4      = input(14, 0)
+via45       = input(15, 0)
+metal5      = input(16, 0)
+via56       = input(17, 0)
+metal6      = input(18, 0)
+prboundary  = input(99, 0)
+metal1_lbl  = labels(101,0)
+
+# DERIVED LAYERS ########################################
+substrate             = polygon_layer.not(nwell)
+active_in_nwell       = active.and(nwell)
+pactive               = active_in_nwell.and(psel)
+pgate                 = pactive.and(poly)
+psd                   = pactive.not(pgate)
+ntap                  = active_in_nwell.and(nsel)
+active_outside_nwell  = active.not(nwell)
+nactive               = active_outside_nwell.and(nsel)
+ngate                 = nactive.and(poly)
+nsd                   = nactive.not(ngate)
+ptap                  = active_outside_nwell.and(psel)
+
+# EXTRACTION ############################################
+extract_devices(mos4("PMOS"), { "SD" =&gt; psd, "G" =&gt; pgate, "W" =&gt; nwell, 
+                                "tS" =&gt; psd, "tD" =&gt; psd, "tG" =&gt; poly, "tW" =&gt; nwell })
+extract_devices(mos4("NMOS"), { "SD" =&gt; nsd, "G" =&gt; ngate, "W" =&gt; substrate, 
+                                "tS" =&gt; nsd, "tD" =&gt; nsd, "tG" =&gt; poly, "tW" =&gt; substrate })
+
+# CONNECTIVITY ##########################################
+connect(psd,        contact)
+connect(nsd,        contact)
+connect(poly,       contact)
+connect(ntap,       contact)
+connect(nwell,      ntap)
+connect(ptap,       contact)
+connect(contact,    metal1)
+connect(metal1,     metal1_lbl)
+connect(metal1,     via12)
+connect(via12,      metal2)
+connect(metal2,     via23)
+connect(via23,      metal3)
+connect(metal3,     via34)
+connect(via34,      metal4)
+connect(metal4,     via45)
+connect(via45,      metal5)
+connect(metal5,     via56)
+connect(via56,      metal6)
+
+connect_global(substrate, "VSS")
+connect_global(ptap, "VSS")
+connect_global(nwell, "VDD")
+
+# NETLIST AND COMPARE ###################################
+netlist
+# hierarchy alignment (flatten out unmatched cells)
+align
+# netlist normalization and device combination, make_top_level_pins, purge, combine_devices, and purge_nets
+netlist.simplify
+# netlist vs. schematic
+compare
+flag_missing_ports
+</text>
+</klayout-macro>
