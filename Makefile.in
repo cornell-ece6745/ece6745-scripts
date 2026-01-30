@@ -15,14 +15,15 @@ install_exes = \
   $(src_dir)/bin/tinyrv2-objdump \
   $(src_dir)/bin/tinyflow-ngspice \
   $(src_dir)/bin/tinyflow-batch-drc \
+  $(src_dir)/bin/tinyflow-batch-lvs \
 
 install_etcs = \
   $(src_dir)/etc/ece6745-git-config \
 
 install_shares = \
-  $(src_dir)/share/tinyflow-batch-drc/batch-drc.rb \
   $(src_dir)/share/tinyflow-ngspice/tinyflow-ngspice-tb-tmpl.sp \
-
+  $(src_dir)/share/tinyflow-batch-drc/batch-drc.rb \
+  $(src_dir)/share/tinyflow-batch-lvs/batch-lvs.rb \
 #-------------------------------------------------------------------------
 # Basic setup
 #-------------------------------------------------------------------------
@@ -109,6 +110,11 @@ install-shares : $(install_shares)
                    $(DESTDIR)/share/tinyflow-ngspice
 	$(INSTALL_SHARE) $(src_dir)/share/tinyflow-batch-drc/batch-drc.rb \
                    $(DESTDIR)/share/tinyflow-batch-drc
+	$(MKINSTALLDIRS) $(DESTDIR)/share/tinyflow-batch-lvs
+	$(INSTALL_SHARE) $(src_dir)/share/tinyflow-batch-lvs/batch-lvs.rb \
+                   $(DESTDIR)/share/tinyflow-batch-lvs
+	$(INSTALL_SHARE) $(src_dir)/share/tinyflow-batch-lvs/batch-cell-lvs.lylvs \
+                   $(DESTDIR)/share/tinyflow-batch-lvs
 
 install : install-exes install-etcs install-shares
 ifeq ($(enable_stow),yes)

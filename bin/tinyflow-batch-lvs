@@ -18,8 +18,8 @@ EXTRACTION_DIR = "./rcx-results/"
 
 # Get the directory where this script is located
 SCRIPT_DIR = Path(__file__).parent.absolute()
-BATCH_LVS_RB = SCRIPT_DIR / "../share/tinyflow-batch-drc/batch-lvs.rb"
-LVS_DECK = SCRIPT_DIR / "batch-cell-lvs.lylvs"
+BATCH_LVS_RB = SCRIPT_DIR / "../share/tinyflow-batch-lvs/batch-lvs.rb"
+LVS_DECK = SCRIPT_DIR / "../share/tinyflow-batch-lvs/batch-cell-lvs.lylvs"
 
 def main():
     # Check if batch-lvs.rb exists
