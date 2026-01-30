@@ -14,11 +14,13 @@ install_exes = \
   $(src_dir)/bin/pyhflow \
   $(src_dir)/bin/tinyrv2-objdump \
   $(src_dir)/bin/tinyflow-ngspice \
+  $(src_dir)/bin/tinyflow-batch-drc \
 
 install_etcs = \
   $(src_dir)/etc/ece6745-git-config \
 
 install_shares = \
+  $(src_dir)/share/tinyflow-batch-drc/batch-drc.rb \
   $(src_dir)/share/tinyflow-ngspice/tinyflow-ngspice-tb-tmpl.sp \
 
 #-------------------------------------------------------------------------
@@ -102,8 +104,11 @@ install-etcs : $(install_etcs)
 install-shares : $(install_shares)
 	$(MKINSTALLDIRS) $(DESTDIR)/share
 	$(MKINSTALLDIRS) $(DESTDIR)/share/tinyflow-ngspice
+	$(MKINSTALLDIRS) $(DESTDIR)/share/tinyflow-batch-drc
 	$(INSTALL_SHARE) $(src_dir)/share/tinyflow-ngspice/tinyflow-ngspice-tb-tmpl.sp \
                    $(DESTDIR)/share/tinyflow-ngspice
+	$(INSTALL_SHARE) $(src_dir)/share/tinyflow-batch-drc/batch-drc.rb \
+                   $(DESTDIR)/share/tinyflow-batch-drc
 
 install : install-exes install-etcs install-shares
 ifeq ($(enable_stow),yes)
