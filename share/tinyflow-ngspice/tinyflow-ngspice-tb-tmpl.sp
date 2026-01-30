@@ -27,7 +27,7 @@ XU1 A B Y VDD 0 NAND2X1
 {%- elif cell == 'NOR2X1' -%}
 XU1 A B Y VDD 0 NOR2X1
 {%- elif cell == 'AOI21X1' -%}
-XU1 A B C Y VDD 0 AOI21X1
+XU1 B C A Y VDD 0 AOI21X1
 {%- elif cell == 'TIEHI' -%}
 XU1 Y VDD 0 TIEHI
 {%- elif cell == 'TIELO' -%}
