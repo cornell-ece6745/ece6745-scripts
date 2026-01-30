@@ -381,12 +381,34 @@ class TinyFlowNgspice:
 
     # Invoke ngspice with the generated testbench
     result = subprocess.run(
-      ['ngspice', self.tb_data['tb_path']],
+      ['ngspice', '-b', self.tb_data['tb_path']],
       capture_output=True,
       text=True
     )
 
     output = result.stdout + result.stderr
+
+    # Filter out specific measurement interval errors from stderr - these are
+    # expected when transitions are not captured within the simulation time,
+    # also filter out non-increasing PWL time points warnings since we want the
+    # optimal step function inputs for our simulations
+    filtered_stderr_lines = []
+    for line in result.stderr.splitlines():
+      if "Error: measure  t_pdr  trig(TRIG) : out of interval" in line:
+        continue
+      if "Error: measure  t_pdf  trig(TRIG) : out of interval" in line:
+        continue
+      if "non-increasing PWL time points" in line:
+        continue
+      filtered_stderr_lines.append(line)
+    filtered_stderr = '\n'.join(filtered_stderr_lines)
+
+    # Print raw output
+    if filtered_stderr.strip() != '':
+      print("------------------------------------------------")
+      print("Ngspice Errors/Warnings:\n")
+      print(filtered_stderr)
+      print("------------------------------------------------")
 
     # Split output by "Measuring delays for input pin X" sections
     sections = re.split(r'Measuring delays for input pin (\w+)', output)
