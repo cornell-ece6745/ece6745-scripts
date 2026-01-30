@@ -17,7 +17,7 @@ OUTPUT_DIR = "./drc_results/"
 
 # Get the directory where this script is located
 SCRIPT_DIR = Path(__file__).parent.absolute()
-BATCH_DRC_RB = SCRIPT_DIR / "../share/batch-drc.rb"
+BATCH_DRC_RB = SCRIPT_DIR / "../share/tinyflow-batch-drc/batch-drc.rb"
 
 def main():
     # Check if batch-drc.rb exists
