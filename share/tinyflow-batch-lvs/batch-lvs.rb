@@ -150,7 +150,7 @@ results[:pass].each { |c| puts "  #{c}" }
 if results[:fail].any?
   puts "\nFailed: #{results[:fail].length}/#{cells.length}"
   results[:fail].each do |f|
-    puts "  #{f[:name]} -#{f[:errors].length} issue(s) - check GUI LVS for details"
+    puts "  #{f[:name]} - #{f[:errors].length} issue(s) - check GUI LVS for details"
   end
 end
 
