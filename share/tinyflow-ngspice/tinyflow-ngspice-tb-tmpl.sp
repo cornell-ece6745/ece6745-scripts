@@ -6,6 +6,8 @@
 
 * Set parameters and include cell library
 .param SUPPLY=1.8
+.lib '{{ tech_lib_path }}' ff
+.temp 125
 .inc {{ cell_lib_path }}
 
 * VDD source

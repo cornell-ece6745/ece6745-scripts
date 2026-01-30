@@ -192,6 +192,9 @@ class TinyFlowNgspice:
     self.tb_data['cell'] = self.args.cell
     self.tb_data['cload'] = self.args.cload
     self.tb_data['output_basename'] = self._get_output_basename()
+    
+    skywater_spice = os.environ.get('SKYWATER_130NM_SPICE', '')
+    self.tb_data['tech_lib_path'] = f'{skywater_spice}/libs.tech/ngspice/sky130.lib.spice'
 
     # Create output directory
     self.results_dir = Path.cwd() / 'ngspice-results'
@@ -340,11 +343,6 @@ class TinyFlowNgspice:
     content = re.sub(r'\bM\$', 'XM$', content)
     content = re.sub(r'\bM_P', 'XM_P', content)
     content = re.sub(r'\bM_N', 'XM_N', content)
-
-    # Add library reference after "// Date" line
-    skywater_spice = os.environ.get('SKYWATER_130NM_SPICE', '')
-    lib_lines = f"\n.lib '{skywater_spice}/libs.tech/ngspice/sky130.lib.spice' ff\n.temp 125"
-    content = re.sub(r'(\* Date[^\n]*\n)', r'\1' + lib_lines + '\n', content)
 
     # Output cell lib to build directory
     spice_stem = Path(self.args.spice).stem
