@@ -344,7 +344,7 @@ class TinyFlowNgspice:
     # Add library reference after "// Date" line
     skywater_spice = os.environ.get('SKYWATER_130NM_SPICE', '')
     lib_lines = f"\n.lib '{skywater_spice}/libs.tech/ngspice/sky130.lib.spice' ff\n.temp 125"
-    content = re.sub(r'(// Date[^\n]*\n)', r'\1' + lib_lines + '\n', content)
+    content = re.sub(r'(\* Date[^\n]*\n)', r'\1' + lib_lines + '\n', content)
 
     # Output cell lib to build directory
     spice_stem = Path(self.args.spice).stem
