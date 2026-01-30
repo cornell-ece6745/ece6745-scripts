@@ -194,8 +194,8 @@ class TinyFlowNgspice:
     self.tb_data['output_basename'] = self._get_output_basename()
 
     # Create output directory
-    results_dir = Path.cwd() / 'ngspice-results'
-    results_dir.mkdir(exist_ok=True)
+    self.results_dir = Path.cwd() / 'ngspice-results'
+    self.results_dir.mkdir(exist_ok=True)
     self.output_dir = results_dir / self.tb_data['output_basename']
     self.output_dir.mkdir(exist_ok=True)
     self.tb_data['output_dir'] = str(self.output_dir)
@@ -329,7 +329,7 @@ class TinyFlowNgspice:
     # Get cell spice lib from user-specified path
     input_file = Path(self.args.spice)
     if not input_file.is_absolute():
-      input_file = Path.cwd() / input_file
+      input_file = self.results_dir / input_file
 
     # Read input file
     content = input_file.read_text()
@@ -348,7 +348,7 @@ class TinyFlowNgspice:
 
     # Output cell lib to build directory
     spice_stem = Path(self.args.spice).stem
-    output_file = (Path.cwd() / f'{spice_stem}-sky130.sp').resolve()
+    output_file = (self.results_dir / f'{spice_stem}-sky130.sp').resolve()
     output_file.write_text(content)
 
     self.tb_data['cell_lib_path'] = str(output_file)
