@@ -403,7 +403,7 @@ class TinyFlowNgspice:
       filtered_stderr_lines.append(line)
     filtered_stderr = '\n'.join(filtered_stderr_lines)
 
-    # Print raw output
+    # Print errors and warnings if any remain after filtering
     if filtered_stderr.strip() != '':
       print("------------------------------------------------")
       print("Ngspice Errors/Warnings:\n")
