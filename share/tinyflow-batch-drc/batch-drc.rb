@@ -9,7 +9,7 @@ require 'fileutils'
 require 'rexml/document'
 
 input_file = File.absolute_path($input)
-output_dir = $output_dir || "drc_results"
+output_dir = $output_dir || "drc-results"
 drc_deck = File.absolute_path($drc || "scripts/drc/batch/cell.lydrc")
 skip_cells = #["FILL"]
 
