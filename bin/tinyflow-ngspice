@@ -329,7 +329,7 @@ class TinyFlowNgspice:
     # Get cell spice lib from user-specified path
     input_file = Path(self.args.spice)
     if not input_file.is_absolute():
-      input_file = self.results_dir / input_file
+      input_file = Path.cwd() / input_file
 
     # Read input file
     content = input_file.read_text()
