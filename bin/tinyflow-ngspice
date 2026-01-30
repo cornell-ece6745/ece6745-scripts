@@ -396,7 +396,11 @@ class TinyFlowNgspice:
     for line in result.stderr.splitlines():
       if "Error: measure  t_pdr  trig(TRIG) : out of interval" in line:
         continue
+      if "Error: measure  t_pdr  trig(TARG) : out of interval" in line:
+        continue
       if "Error: measure  t_pdf  trig(TRIG) : out of interval" in line:
+        continue
+      if "Error: measure  t_pdf  trig(TARG) : out of interval" in line:
         continue
       if "non-increasing PWL time points" in line:
         continue
