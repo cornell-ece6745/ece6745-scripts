@@ -106,7 +106,7 @@ cells.each do |cell_name|
   
   report_file = File.absolute_path("#{output_dir}/#{cell_name}-lvslvs.lvsdb")
   target_file = File.absolute_path("#{extraction_dir}/#{cell_name}-rcx.sp")
-  schematic_file = File.absolute_path("#{schematic_dir}/stdcells.sp")
+  schematic_file = File.absolute_path("#{schematic_dir}")
   
   # Check if schematic exists
   unless File.exist?(schematic_file)
