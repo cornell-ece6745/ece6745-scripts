@@ -136,7 +136,7 @@ cells.each do |cell_name|
     results[:pass] << cell_name
   else
     error_count = lvs_result[:errors].length
-    puts "FAILED - #{error_count} issue(s)"
+    puts "FAILED - #{error_count} issue(s) - check GUI LVS for details"
     results[:fail] << { name: cell_name, errors: lvs_result[:errors] }
   end
 end
