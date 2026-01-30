@@ -77,13 +77,13 @@ cells.each do |cell_name|
   violations = count_violations(report_file)
   
   if violations.nil?
-    puts "✗ Failed - no report generated"
+    puts "Failed - no report generated"
     results[:fail] << { name: cell_name, errors: "no report", details: {} }
   elsif violations[:total] == 0
-    puts "✓ CLEAN"
+    puts "CLEAN"
     results[:pass] << cell_name
   else
-    puts "✗ FAILED - #{violations[:total]} violation(s):"
+    puts "FAILED - #{violations[:total]} violation(s):"
     violations[:by_rule].each do |rule, count|
       puts "    [#{count}] #{rule}"
     end
@@ -95,12 +95,12 @@ puts "\n#{'='*50}"
 puts "SUMMARY"
 puts '='*50
 puts "Clean: #{results[:pass].length}/#{cells.length}"
-results[:pass].each { |c| puts "  ✓ #{c}" }
+results[:pass].each { |c| puts "  #{c}" }
 
 if results[:fail].any?
   puts "\nFailed: #{results[:fail].length}/#{cells.length}"
   results[:fail].each do |f|
-    puts "  ✗ #{f[:name]}: #{f[:errors]} violation(s)"
+    puts "  #{f[:name]}: #{f[:errors]} violation(s)"
     f[:details].each do |rule, count|
       puts "      [#{count}] #{rule}"
     end
