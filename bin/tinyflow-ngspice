@@ -194,7 +194,7 @@ class TinyFlowNgspice:
     self.tb_data['output_basename'] = self._get_output_basename()
 
     # Create output directory
-    self.output_dir = Path.cwd() / self.tb_data['output_basename']
+    self.output_dir = Path.cwd() / 'ngspice-results' / self.tb_data['output_basename']
     self.output_dir.mkdir(exist_ok=True)
     self.tb_data['output_dir'] = str(self.output_dir)
 
