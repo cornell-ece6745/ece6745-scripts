@@ -8,7 +8,7 @@
 require 'fileutils'
 
 input_file = File.absolute_path($input)
-schematic_dir = File.absolute_path($schematic)
+schematic_file = File.absolute_path($schematic)
 output_dir = $output_dir || "lvs_results"
 extraction_dir = $extraction_dir || "extraction_results"
 lvs_deck = File.absolute_path($lvs || "scripts/lvs/batch-process/batch-cell-lvs.lylvs")
@@ -106,7 +106,7 @@ cells.each do |cell_name|
   
   report_file = File.absolute_path("#{output_dir}/#{cell_name}-lvslvs.lvsdb")
   target_file = File.absolute_path("#{extraction_dir}/#{cell_name}-rcx.sp")
-  schematic_file = File.absolute_path("#{schematic_dir}")
+  schematic_file = File.absolute_path("#{schematic_file}")
   
   # Check if schematic exists
   unless File.exist?(schematic_file)
@@ -129,14 +129,14 @@ cells.each do |cell_name|
   lvs_result = parse_lvs_report(report_file)
   
   if lvs_result.nil?
-    puts "✗ Failed - no report generated"
+    puts "Failed - no report generated"
     results[:error] << { name: cell_name, reason: "no report" }
   elsif lvs_result[:match]
-    puts "✓ CLEAN"
+    puts "CLEAN"
     results[:pass] << cell_name
   else
     error_count = lvs_result[:errors].length
-    puts "✗ FAILED - #{error_count} issue(s)"
+    puts "FAILED - #{error_count} issue(s)"
     results[:fail] << { name: cell_name, errors: lvs_result[:errors] }
   end
 end
@@ -145,12 +145,12 @@ puts "\n#{'='*50}"
 puts "SUMMARY"
 puts '='*50
 puts "Clean: #{results[:pass].length}/#{cells.length}"
-results[:pass].each { |c| puts "  ✓ #{c}" }
+results[:pass].each { |c| puts "  #{c}" }
 
 if results[:fail].any?
   puts "\nFailed: #{results[:fail].length}/#{cells.length}"
   results[:fail].each do |f|
-    puts "  ✗ #{f[:name]} (#{f[:errors].length} issues)"
+    puts "  #{f[:name]} (#{f[:errors].length} issues)"
   end
 end
 
