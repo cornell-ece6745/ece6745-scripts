@@ -24,43 +24,132 @@ import sys
 class TinyFlowSchema:
   """Schema validator for TinyFlow ngspice arguments."""
 
-  CELL_CHOICES = ['INVX1', 'NAND2X1', 'NOR2X1', 'AOI21X1', 'TIEHI', 'TIELO']
-  REQUIRED_PINS = {
-    'INVX1': {'A'},
-    'NAND2X1': {'A', 'B'},
-    'NOR2X1': {'A', 'B'},
-    'AOI21X1': {'A', 'B', 'C'},
-    'TIEHI': set(),
-    'TIELO': set(),
-  }
   PIN_SPEC_PATTERN = r'^([A-Za-z_][A-Za-z0-9_]*):([01])(-[01])*$'
   CLOAD_PATTERN = r'^(\d+\.?\d*|\.\d+)(a|f|p|n|u|m)?$'
 
   def __init__(
-    self
+    self,
+    spice_path=None
   ):
+    self._spice_path = spice_path
+    self._cell_info = {}  # Will be populated during validation
+
     self._schema = Schema(And(
       {
-        'cell': And(str, lambda c: c in self.CELL_CHOICES,
-                    error=f"invalid cell type, must be one of {self.CELL_CHOICES}"),
+        'cell': str,
         'cload': And(str, Regex(self.CLOAD_PATTERN),
                      error='invalid cload, expected decimal with optional unit suffix (a, f, p, n, u, m)'),
         'inputs': str,
         'spice': And(str, self._validate_spice_file,
                      error='spice file does not exist')
       },
+      self._validate_cell_exists,
       self._validate_inputs_for_cell
     ))
+
+  def _parse_spice_cells(
+    self,
+    spice_path
+  ):
+    """
+    Parse a SPICE file and extract cell names and their pin information.
+
+    Handles two formats:
+    1. Named pins: .SUBCKT NOR2X1 A B Y VDD VSS
+    2. Numbered pins with comments:
+      * cell AOI21X1
+      * pin B
+      * pin C
+      * pin A
+      * pin Y
+      * pin VDD
+      * pin VSS
+      .SUBCKT AOI21X1 1 2 3 4 7 8
+
+    Returns:
+      dict: {cell_name: [ordered_pins_excluding_VDD_VSS], ...}
+    """
+    path = Path(spice_path)
+    if not path.is_absolute():
+      path = Path.cwd() / path
+
+    if not path.exists():
+      return {}
+
+    content = path.read_text()
+    lines = content.splitlines()
+
+    cells = {}
+
+    i = 0
+    while i < len(lines):
+      line = lines[i].strip()
+
+      # Look for .SUBCKT lines
+      if line.upper().startswith('.SUBCKT'):
+        parts = line.split()
+        if len(parts) >= 2:
+          cell_name = parts[1]
+          subckt_tokens = parts[2:]  # Everything after cell name
+
+          # Check if tokens are numbered (all digits) or named
+          all_numeric = all(token.isdigit() for token in subckt_tokens if token)
+
+          if all_numeric and subckt_tokens:
+            # Numbered pins - look for * pin comments above
+            pin_names = []
+            j = i - 1
+            while j >= 0:
+              prev_line = lines[j].strip()
+              if prev_line.startswith('* pin '):
+                pin_name = prev_line[6:].strip()
+                pin_names.insert(0, pin_name)  # Insert at beginning since we're going backwards
+                j -= 1
+              elif prev_line.startswith('* cell '):
+                break
+              elif prev_line == '' or prev_line.startswith('*'):
+                j -= 1
+              else:
+                break
+
+            # Filter out VDD and VSS, keep order
+            ordered_pins = [p for p in pin_names if p.upper() not in ('VDD', 'VSS')]
+            cells[cell_name] = ordered_pins
+          else:
+            # Named pins directly in .SUBCKT line
+            ordered_pins = [p for p in subckt_tokens if p.upper() not in ('VDD', 'VSS')]
+            cells[cell_name] = ordered_pins
+
+        i += 1
+      else:
+        i += 1
+
+    return cells
 
   def _validate_spice_file(
     self,
     spice_path
   ):
-    """Validate that the spice file exists."""
+    """Validate that the spice file exists and parse cell info."""
     path = Path(spice_path)
     if not path.is_absolute():
       path = Path.cwd() / path
-    return path.exists()
+    if not path.exists():
+      return False
+    # Parse cell info from the spice file
+    self._cell_info = self._parse_spice_cells(spice_path)
+    return True
+
+  def _validate_cell_exists(
+    self,
+    data
+  ):
+    """Validate that the cell exists in the spice file."""
+    cell = data['cell']
+    if cell not in self._cell_info:
+      available_cells = list(self._cell_info.keys())
+      raise SchemaError(f"cell '{cell}' not found in spice file, available cells: {available_cells}")
+    return data
 
   def _validate_inputs_for_cell(
     self,
@@ -69,7 +158,9 @@ class TinyFlowSchema:
     """Validate inputs string format and required pins for the cell type."""
     cell = data['cell']
     inputs_str = data['inputs']
-    expected_pins = self.REQUIRED_PINS.get(cell, set())
+    # Get pins from parsed cell info, excluding output pin 'Y'
+    cell_pins = self._cell_info.get(cell, [])
+    expected_pins = set(p for p in cell_pins if p.upper() != 'Y')
 
     # Handle cells with no inputs (TIEHI/TIELO)
     if not expected_pins:
@@ -122,6 +213,13 @@ class TinyFlowSchema:
     """Validate argparse Namespace against schema."""
     return self._schema.validate(vars(args))
 
+  def get_cell_pins(
+    self,
+    cell_name
+  ):
+    """Get the ordered list of pins for a cell (excluding VDD/VSS)."""
+    return self._cell_info.get(cell_name, [])
+
 class TinyFlowNgspice:
   """TinyFlow ngspice simulation and characterization wrapper."""
 
@@ -153,8 +251,7 @@ class TinyFlowNgspice:
       '--cell',
       type=str,
       required=True,
-      choices=TinyFlowSchema.CELL_CHOICES,
-      help='Type of standard cell to simulate'
+      help='Type of standard cell to simulate (must exist in spice file)'
     )
 
     parser.add_argument(
@@ -182,7 +279,8 @@ class TinyFlowNgspice:
 
     # Validate arguments against schema
     try:
-      TinyFlowSchema().validate(self.args)
+      schema = TinyFlowSchema()
+      schema.validate(self.args)
     except SchemaError as e:
       print(f"Error: {e}", file=sys.stderr)
       sys.exit(1)
@@ -192,6 +290,8 @@ class TinyFlowNgspice:
     self.tb_data['cell'] = self.args.cell
     self.tb_data['cload'] = self.args.cload
     self.tb_data['output_basename'] = self._get_output_basename()
+    # Get ordered pins from spice file for circuit instantiation
+    self.tb_data['cell_pins'] = schema.get_cell_pins(self.args.cell)
     
     skywater_spice = os.environ.get('SKYWATER_130NM_SPICE', '')
     self.tb_data['tech_lib_path'] = f'{skywater_spice}/libs.tech/ngspice/sky130.lib.spice'
@@ -207,7 +307,6 @@ class TinyFlowNgspice:
     (
         self.tb_data['input_stimuli'],
         self.tb_data['sim_time'],
-        self.tb_data['initial_output'],
     ) = self._parse_inputs()
 
   def _get_output_basename(
@@ -248,15 +347,14 @@ class TinyFlowNgspice:
     - Each step is 2ns apart
 
     Returns:
-      tuple: (input_stimuli dict, sim_time string, initial_output string)
+      tuple: (input_stimuli dict, sim_time string)
     """
 
     cell = self.args.cell
 
-    # Handle TIEHI/TIELO (no inputs)
-    if cell in ('TIEHI', 'TIELO'):
-      initial_output = 'SUPPLY' if cell == 'TIEHI' else '0'
-      return {}, '2ns', initial_output
+    # Handle cells with no inputs (e.g., TIEHI/TIELO)
+    if not self.args.inputs or not self.args.inputs.strip():
+      return {}, '2ns'
 
     input_stimuli = {}
     step_counts = []
@@ -300,29 +398,7 @@ class TinyFlowNgspice:
     # Sim time: 2ns * number of values (includes margin after last transition)
     sim_time = f'{step_counts[0] * 2}ns'
 
-    # Calculate initial output based on cell logic and first input values
-    if cell == 'INVX1':
-      # Y = NOT(A)
-      initial_output_val = not initial_values['A']
-    elif cell == 'NAND2X1':
-      # Y = NOT(A AND B)
-      initial_output_val = not (initial_values['A'] and initial_values['B'])
-    elif cell == 'NOR2X1':
-      # Y = NOT(A OR B)
-      initial_output_val = not (initial_values['A'] or initial_values['B'])
-    elif cell == 'AOI21X1':
-      # Y = NOT((A AND B) OR C)
-      initial_output_val = not ((initial_values['A'] and initial_values['B']) or initial_values['C'])
-    elif cell == 'TIEHI':
-      initial_output_val = True
-    elif cell == 'TIELO':
-      initial_output_val = False
-    else:
-      initial_output_val = False  # Default to low
-
-    initial_output = 'SUPPLY' if initial_output_val else '0'
-
-    return input_stimuli, sim_time, initial_output
+    return input_stimuli, sim_time
 
   def convert_cell_lib(
     self

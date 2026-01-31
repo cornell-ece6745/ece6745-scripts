@@ -22,22 +22,7 @@ Vin{{ loop.index }} {{ input_pin }} 0 PWL({{ stimulus }})
 {% endfor %}
 
 * Instantiate circuit
-{% if cell == 'INVX1' -%}
-XU1 A Y VDD 0 INVX1
-{%- elif cell == 'NAND2X1' -%}
-XU1 A B Y VDD 0 NAND2X1
-{%- elif cell == 'NOR2X1' -%}
-XU1 A B Y VDD 0 NOR2X1
-{%- elif cell == 'AOI21X1' -%}
-XU1 B C A Y VDD 0 AOI21X1
-{%- elif cell == 'TIEHI' -%}
-XU1 Y VDD 0 TIEHI
-{%- elif cell == 'TIELO' -%}
-XU1 Y VDD 0 TIELO
-{%- endif %}
-
-* Set initial conditions
-.ic V(Y)={{ initial_output }}
+XU1 {{ cell_pins|join(' ') }} VDD 0 {{ cell }}
 
 * Simulation control
 .control
@@ -45,8 +30,8 @@ XU1 Y VDD 0 TIELO
   tran 1ps {{ sim_time }}
   {% for input_pin in input_stimuli.keys() %}
   echo "Measuring delays for input pin {{ input_pin }}"
-  meas tran t_pdf TRIG v({{ input_pin }}) VAL=0.9 RISE=1 TARG v(Y) VAL=0.9 FALL=1
-  meas tran t_pdr TRIG v({{ input_pin }}) VAL=0.9 FALL=1 TARG v(Y) VAL=0.9 RISE=1
+  meas tran t_pdf TRIG v({{ input_pin }}) VAL=0.9 RISE=1 TARG v(Y) VAL=0.9 FALL=1 FROM=1ns
+  meas tran t_pdr TRIG v({{ input_pin }}) VAL=0.9 FALL=1 TARG v(Y) VAL=0.9 RISE=1 FROM=1ns
   {% endfor %}
   wrdata {{ output_dir }}/{{ output_basename }}.csv {% for input_pin in input_stimuli.keys() %}V({{ input_pin }}) {% endfor %}V(Y)
   quit
