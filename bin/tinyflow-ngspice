@@ -498,31 +498,36 @@ class TinyFlowNgspice:
     if csv_file.exists():
       self._print_transitions(csv_file)
 
-    # sections[0] is before first match, then alternates: pin, content, pin, content...
+    # sections[0] is before first match, then alternates: pin, content, pin,
+    # content...
     self._log("\nMeasured delays:")
-    for i in range(1, len(sections), 2):
-      pin = sections[i]
-      content = sections[i + 1] if i + 1 < len(sections) else ''
+    if len(sections) <= 1:
+      # No input pins specified, no delay measurements to report
+      self._log("  No measured delays found")
+    else:
+      for i in range(1, len(sections), 2):
+        pin = sections[i]
+        content = sections[i + 1] if i + 1 < len(sections) else ''
 
-      # Extract t_pdf value (before "targ")
-      t_pdf_match = re.search(r't_pdf\s*=\s*([\d.e+-]+)\s*targ', content)
-      t_pdr_match = re.search(r't_pdr\s*=\s*([\d.e+-]+)\s*targ', content)
+        # Extract t_pdf value (before "targ")
+        t_pdf_match = re.search(r't_pdf\s*=\s*([\d.e+-]+)\s*targ', content)
+        t_pdr_match = re.search(r't_pdr\s*=\s*([\d.e+-]+)\s*targ', content)
 
-      # Determine t_pdf result
-      if t_pdf_match and float(t_pdf_match.group(1)) >= 0:
-        t_pdf_str = f'{t_pdf_match.group(1)} s'
-      else:
-        t_pdf_str = 'not captured'
+        # Determine t_pdf result
+        if t_pdf_match and float(t_pdf_match.group(1)) >= 0:
+          t_pdf_str = f'{t_pdf_match.group(1)} s'
+        else:
+          t_pdf_str = 'not captured'
 
-      # Determine t_pdr result
-      if t_pdr_match and float(t_pdr_match.group(1)) >= 0:
-        t_pdr_str = f'{t_pdr_match.group(1)} s'
-      else:
-        t_pdr_str = 'not captured'
+        # Determine t_pdr result
+        if t_pdr_match and float(t_pdr_match.group(1)) >= 0:
+          t_pdr_str = f'{t_pdr_match.group(1)} s'
+        else:
+          t_pdr_str = 'not captured'
 
-      self._log(f"{pin}->Y:")
-      self._log(f"  t_pdf = {t_pdf_str}")
-      self._log(f"  t_pdr = {t_pdr_str}")
+        self._log(f"{pin}->Y:")
+        self._log(f"  t_pdf = {t_pdf_str}")
+        self._log(f"  t_pdr = {t_pdr_str}")
     self._log()
 
     # Write results to text file
