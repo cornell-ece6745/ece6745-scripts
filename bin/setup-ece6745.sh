@@ -302,6 +302,7 @@ module_load riscv-gnu-toolchain/670-g049b329
 module_load klayout/0.30.5
 module_load ngspice/45.2
 module_load openram/1.2.48-forked
+module_load netlistsvg/11-gd3518f1
 
 # ASIC Commercial Tools
 
