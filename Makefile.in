@@ -16,6 +16,7 @@ install_exes = \
   $(src_dir)/bin/tinyflow-ngspice \
   $(src_dir)/bin/tinyflow-batch-drc \
   $(src_dir)/bin/tinyflow-batch-lvs \
+  $(src_dir)/bin/tinyflow-netlist2svg \
 
 install_etcs = \
   $(src_dir)/etc/ece6745-git-config \
@@ -24,6 +25,7 @@ install_shares = \
   $(src_dir)/share/tinyflow-ngspice/tinyflow-ngspice-tb-tmpl.sp \
   $(src_dir)/share/tinyflow-batch-drc/batch-drc.rb \
   $(src_dir)/share/tinyflow-batch-lvs/batch-lvs.rb \
+
 #-------------------------------------------------------------------------
 # Basic setup
 #-------------------------------------------------------------------------
