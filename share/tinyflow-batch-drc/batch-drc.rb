@@ -20,8 +20,14 @@ FileUtils.mkdir_p(output_dir)
 layout = RBA::Layout.new
 layout.read(input_file)
 
-cells = layout.each_cell.map(&:name).reject { |c| skip_cells.include?(c) }
-puts "Found #{cells.length} cells: #{cells.join(', ')}"
+top_cells = layout.top_cells.map(&:name)
+if top_cells.length == 1
+  cells = top_cells
+  puts "Top cell: #{cells[0]}"
+else
+  cells = layout.each_cell.map(&:name).reject { |c| skip_cells.include?(c) }
+  puts "No single top cell found, running on all #{cells.length} cells: #{cells.join(', ')}"
+end
 
 results = { pass: [], fail: [] }
 
