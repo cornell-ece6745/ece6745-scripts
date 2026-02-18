@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 #=========================================================================
-# Wrapper script for running batch DRC on stdcells.gds using KLayout
+# Wrapper script for running batch DRC using KLayout
+#=========================================================================
+# Usage: tinyflow-batch-drc <input.gds>
 #=========================================================================
 # Authors : Vayun Tiwari
 # Date    : January 2026
@@ -10,44 +12,38 @@ import sys
 import os
 from pathlib import Path
 
-# Fixed paths as specified
-INPUT_GDS = "../stdcells.gds"
 LYDRC = "/classes/ece6745/install/adks/tinyflow-180nm/drc/tinyflow-180nm.lydrc"
 OUTPUT_DIR = "./drc_results/"
 
-# Get the directory where this script is located
 SCRIPT_DIR = Path(__file__).parent.absolute()
 BATCH_DRC_RB = SCRIPT_DIR / "../share/tinyflow-batch-drc/batch-drc.rb"
 
 def main():
-    # Check if batch-drc.rb exists
-    if not BATCH_DRC_RB.exists():
-        print(f"Error: batch-drc.rb not found at {BATCH_DRC_RB}", file=sys.stderr)
+    if len(sys.argv) != 2:
+        print(f"Usage: {sys.argv[0]} <input.gds>", file=sys.stderr)
         sys.exit(1)
-    
-    # Check if input GDS exists (relative to current working directory)
-    input_path = Path(INPUT_GDS).resolve()
+
+    input_path = Path(sys.argv[1]).resolve()
     if not input_path.exists():
         print(f"Error: Input GDS file not found at {input_path}", file=sys.stderr)
         sys.exit(1)
-    
-    # Check if LYDRC exists
+
+    if not BATCH_DRC_RB.exists():
+        print(f"Error: batch-drc.rb not found at {BATCH_DRC_RB}", file=sys.stderr)
+        sys.exit(1)
+
     if not Path(LYDRC).exists():
         print(f"Error: DRC rule deck not found at {LYDRC}", file=sys.stderr)
         sys.exit(1)
-    
-    # Get klayout command - check environment variable first (like batch-drc.rb does)
-    # Fallback to the ECE6745 installation path if not in PATH
+
     klayout_cmd = os.environ.get('KLAYOUT', 'klayout')
     klayout_ece6745_path = '/classes/ece6745/install/pkgs/klayout-0.30.5/bin/klayout'
-    
-    # Check if klayout is available in PATH, otherwise use ECE6745 path
+
     if klayout_cmd == 'klayout':
         import shutil
         if not shutil.which('klayout') and os.path.exists(klayout_ece6745_path):
             klayout_cmd = klayout_ece6745_path
-    
-    # Build the klayout command
+
     cmd = [
         klayout_cmd,
         "-b",
@@ -56,8 +52,7 @@ def main():
         "-rd", f"drc={LYDRC}",
         "-rd", f"output_dir={OUTPUT_DIR}"
     ]
-    
-    # Run the command
+
     try:
         result = subprocess.run(cmd, check=False)
         sys.exit(result.returncode)
