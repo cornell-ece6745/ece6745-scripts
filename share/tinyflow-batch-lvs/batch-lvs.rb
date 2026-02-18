@@ -9,7 +9,7 @@ require 'fileutils'
 
 input_file = File.absolute_path($input)
 schematic_file = File.absolute_path($schematic)
-output_dir = $output_dir || "lvs_results"
+output_dir = $output_dir || "lvs-results"
 extraction_dir = $extraction_dir || "extraction_results"
 lvs_deck = File.absolute_path($lvs || "scripts/lvs/batch-process/batch-cell-lvs.lylvs")
 skip_cells = ["FILL"]
