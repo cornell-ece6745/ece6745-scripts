@@ -115,7 +115,6 @@ def get_step_paths(yaml_path, steps):
 
 def create_directory_copy(source_dir, destination_dir):
   if not os.path.exists(source_dir):
-    print(f"Warning: Step directory '{source_dir}' does not exist. Skipping.", file=sys.stderr)
     return
 
   # Ensure destination directory exists
@@ -197,7 +196,7 @@ def generate_run_flow_script(steps):
   # Add step execution lines
 
   for step in steps:
-    script_content += f"./{step}/run\n"
+    script_content += f"./{os.path.basename(step)}/run\n"
 
   script_content += "\n";
 
@@ -230,11 +229,15 @@ def main():
 
   for step, source_path in step_paths.items():
 
+    if not os.path.exists(source_path):
+      print(f"Error: step not found -- {source_path}", file=sys.stderr)
+      sys.exit(1)
+
     print(f"Processing step {step} ...")
 
     # Copy step directory to current working directory
 
-    copied_files = create_directory_copy(source_path, step)
+    copied_files = create_directory_copy(source_path, os.path.basename(step))
 
     # Process Jinja2 templates inside the copied directory
 

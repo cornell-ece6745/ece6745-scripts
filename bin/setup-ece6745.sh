@@ -335,8 +335,13 @@ cp ${ECE6745_INSTALL}/adks/tinyflow-180nm/tinyflow-180nm.lyt ${HOME}/.klayout/te
 print "  - Setting up environment variables"
 
 export SKYWATER_130NM_SPICE="/classes/ece6745/install/adks/skywater-130nm/download/sky130A"
-export FREEPDK_45NM="${ECE6745_INSTALL}/adks/freepdk-45nm/stdview"
-export TSMC_180NM="${ECE6745_INSTALL}/adks/tsmc-180nm/stdview"
+
+export FREEPDK_45NM_PREFIX="${ECE6745_INSTALL}/adks/freepdk-45nm"
+export FREEPDK_45NM="${FREEPDK_45NM_PREFIX}/stdview"
+
+export TSMC_180NM_PREFIX="${ECE6745_INSTALL}/adks/tsmc-180nm"
+export TSMC_180NM="${TSMC_180NM_PREFIX}/stdview"
+
 export CANVAS_API_COURSEID="85471"
 export GITHUB_ORG="cornell-ece6745"
 
