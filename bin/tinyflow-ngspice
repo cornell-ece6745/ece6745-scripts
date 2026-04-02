@@ -12,6 +12,7 @@ from pathlib import Path
 from schema import Schema, And, Or, Regex, SchemaError
 import argparse
 import jinja2
+import logging
 import matplotlib
 matplotlib.use('Agg')  # Use non-interactive backend before importing pyplot
 import matplotlib.pyplot as plt
@@ -21,7 +22,40 @@ import re
 import subprocess
 import sys
 
-class TinyFlowSchema:
+class TinyFlowNgspiceFormatter(logging.Formatter):
+  """Custom formatter with colored output for different log levels."""
+
+  COLORS = {
+    'DEBUG': '\033[36m',     # Cyan
+    'INFO': '\033[0m',       # Default
+    'WARNING': '\033[93m',   # Yellow
+    'ERROR': '\033[91m',     # Red
+    'CRITICAL': '\033[91m',  # Red
+  }
+  RESET = '\033[0m'
+
+  def format(
+    self,
+    record
+  ):
+    color = self.COLORS.get(record.levelname, self.RESET)
+    message = super().format(record)
+    return f'{color}{message}{self.RESET}'
+
+def setup_logger():
+  """Configure and return the application logger."""
+  logger = logging.getLogger('tinyflow-ngspice')
+  logger.setLevel(logging.INFO)
+
+  handler = logging.StreamHandler()
+  handler.setFormatter(TinyFlowNgspiceFormatter('%(message)s'))
+  logger.addHandler(handler)
+
+  return logger
+
+logger = setup_logger()
+
+class TinyFlowNgspiceSchema:
   """Schema validator for TinyFlow ngspice arguments."""
 
   PIN_SPEC_PATTERN = r'^([A-Za-z_][A-Za-z0-9_]*):([01])(-[01])*$'
@@ -220,8 +254,13 @@ class TinyFlowSchema:
     """Get the ordered list of pins for a cell (excluding VDD/VSS)."""
     return self._cell_info.get(cell_name, [])
 
-class TinyFlowNgspice:
+class TinyFlowNgspiceExecutor:
   """TinyFlow ngspice simulation and characterization wrapper."""
+
+  VDD = 1.8
+  VSS = 0.0
+  LOGIC_THRESHOLD = 0.9  # Voltage threshold for logic level (half of VDD)
+  RAIL_EPSILON = 0.05    # 50mV tolerance for full rail check
 
   def __init__(
     self
@@ -235,7 +274,7 @@ class TinyFlowNgspice:
     line=''
   ):
     """Print line to console and store for file output."""
-    print(line)
+    logger.info(line)
     self.output_lines.append(line)
 
   def parse_args(
@@ -279,10 +318,10 @@ class TinyFlowNgspice:
 
     # Validate arguments against schema
     try:
-      schema = TinyFlowSchema()
+      schema = TinyFlowNgspiceSchema()
       schema.validate(self.args)
     except SchemaError as e:
-      print(f"Error: {e}", file=sys.stderr)
+      logger.error(f"Error: {e}")
       sys.exit(1)
 
     # Set testbench data
@@ -435,7 +474,7 @@ class TinyFlowNgspice:
     # Load testbench template
     template_path = Path(__file__).parent.parent / 'share/tinyflow-ngspice/tinyflow-ngspice-tb-tmpl.sp'
     if not template_path.exists():
-      print(f"Error: template not found: {template_path}", file=sys.stderr)
+      logger.error(f"Error: template not found: {template_path}")
       sys.exit(1)
 
     template_content = template_path.read_text()
@@ -485,10 +524,10 @@ class TinyFlowNgspice:
 
     # Print errors and warnings if any remain after filtering
     if filtered_stderr.strip() != '':
-      print("------------------------------------------------")
-      print("Ngspice Errors/Warnings:\n")
-      print(filtered_stderr)
-      print("------------------------------------------------")
+      logger.warning("------------------------------------------------")
+      logger.warning("Ngspice Errors/Warnings:\n")
+      logger.warning(filtered_stderr)
+      logger.warning("------------------------------------------------")
 
     # Split output by "Measuring delays for input pin X" sections
     sections = re.split(r'Measuring delays for input pin (\w+)', output)
@@ -553,7 +592,7 @@ class TinyFlowNgspice:
     # Parse column pairs: (time, signal_data)
     # Columns are organized as: time1 data1 time2 data2 ...
     if data.size == 0:
-      print("Warning: no waveform data found", file=sys.stderr)
+      logger.warning("Warning: no waveform data found")
       return
     num_cols = data.shape[1]
     num_signals = num_cols // 2
@@ -584,9 +623,6 @@ class TinyFlowNgspice:
     num_steps = sim_time_ns // 2
     sample_times = [(i * 2 + 1) * 1e-9 for i in range(num_steps)]  # 1ns, 3ns, 5ns, ...
 
-    # Voltage threshold for logic level (half of 1.8V supply)
-    threshold = 0.9
-
     # Sample each signal and build transition string
     self._log("\nSignal transitions:")
     for signal_name, (time, signal_data) in signals.items():
@@ -597,11 +633,20 @@ class TinyFlowNgspice:
         if idx >= len(signal_data):
           idx = len(signal_data) - 1
         voltage = signal_data[idx]
-        logic_val = '1' if voltage > threshold else '0'
+        logic_val = '1' if voltage > self.LOGIC_THRESHOLD else '0'
         values.append(logic_val)
 
       transition_str = '-'.join(values)
       self._log(f"  {signal_name}: {transition_str}")
+
+    # Check if all signals go full rail
+    for signal_name, (time, signal_data) in signals.items():
+      min_val = np.min(signal_data)
+      max_val = np.max(signal_data)
+      if min_val > (self.VSS + self.RAIL_EPSILON):
+        logger.error(f"Error: signal {signal_name} does not reach VSS rail (min={min_val:.4f}V, expected <{self.VSS + self.RAIL_EPSILON:.4f}V)")
+      if max_val < (self.VDD - self.RAIL_EPSILON):
+        logger.error(f"Error: signal {signal_name} does not reach VDD rail (max={max_val:.4f}V, expected >{self.VDD - self.RAIL_EPSILON:.4f}V)")
 
   def plot_waveforms(
     self
@@ -611,7 +656,7 @@ class TinyFlowNgspice:
     csv_file = self.output_dir / f'{self.tb_data["output_basename"]}.csv'
 
     if not csv_file.exists():
-      print(f"Error: waveform file not found: {csv_file}", file=sys.stderr)
+      logger.error(f"Error: waveform file not found: {csv_file}")
       return
 
     # Read the header row to get signal names
@@ -684,7 +729,7 @@ class TinyFlowNgspice:
     plt.close(fig)
 
 if __name__ == '__main__':
-  tinyflow_ngspice = TinyFlowNgspice()
+  tinyflow_ngspice = TinyFlowNgspiceExecutor()
   tinyflow_ngspice.parse_args()
   tinyflow_ngspice.convert_cell_lib()
   tinyflow_ngspice.gen_spice_tb()
