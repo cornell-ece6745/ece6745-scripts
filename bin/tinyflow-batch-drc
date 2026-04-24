@@ -12,7 +12,7 @@ import sys
 import os
 from pathlib import Path
 
-LYDRC = "/home/iw87/ece6745/ece6745-tinyflow/pdk/drc/tinyflow-180nm.lydrc"
+LYDRC = "/classes/ece6745/install/adks/tinyflow-180nm/drc/tinyflow-180nm.lydrc"
 OUTPUT_DIR = "./drc_results/"
 
 SCRIPT_DIR = Path(__file__).parent.absolute()

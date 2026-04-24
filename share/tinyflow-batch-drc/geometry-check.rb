@@ -26,68 +26,73 @@ LAYERS_TO_CHECK = [
 
 total_bad = 0
 
-def report_bad(layer, datatype, msg)
-  puts "[BAD] L#{layer}/#{datatype} #{msg}"
+def report_bad(cell, layer, datatype, msg)
+  puts "[BAD] cell=#{cell} L#{layer}/#{datatype} #{msg}"
 end
 
-LAYERS_TO_CHECK.each do |layer, datatype|
+# Walk cell definitions (top + all descendants) directly rather than via
+# begin_shapes_rec, so each stored shape is visited exactly once regardless
+# of how many times its parent cell is instantiated.
+cells_to_check = [top_cell] + top_cell.called_cells.map { |ci| layout.cell(ci) }
+
+layer_indices = LAYERS_TO_CHECK.map do |layer, datatype|
   li = layout.find_layer(LayerInfo.new(layer, datatype))
-  next if li.nil?
+  li ? [layer, datatype, li] : nil
+end.compact
 
-  iter = top_cell.begin_shapes_rec(li)
+cells_to_check.each do |cell|
+  cell_name = cell.name
 
-  until iter.at_end?
-    shape = iter.shape
-
-    begin
-      if shape.is_box?
-        box = shape.box
-        if box.width <= 0 || box.height <= 0
-          report_bad(layer, datatype, "zero-size box #{box}")
-          total_bad += 1
-        end
-
-      elsif shape.is_path?
-        path = shape.path
-
-        if path.width <= 0
-          report_bad(layer, datatype, "path width <= 0 #{path.bbox}")
-          total_bad += 1
-        end
-
-        begin
-          poly = path.polygon
-          if poly.area <= 0
-            report_bad(layer, datatype, "path -> zero-area polygon #{poly.bbox}")
+  layer_indices.each do |layer, datatype, li|
+    cell.shapes(li).each do |shape|
+      begin
+        if shape.is_box?
+          box = shape.box
+          if box.width <= 0 || box.height <= 0
+            report_bad(cell_name, layer, datatype, "zero-size box #{box}")
             total_bad += 1
           end
-        rescue => e
-          report_bad(layer, datatype, "path polygonization failed: #{e.message}")
-          total_bad += 1
+
+        elsif shape.is_path?
+          path = shape.path
+
+          if path.width <= 0
+            report_bad(cell_name, layer, datatype, "path width <= 0 #{path.bbox}")
+            total_bad += 1
+          end
+
+          begin
+            poly = path.polygon
+            if poly.area <= 0
+              report_bad(cell_name, layer, datatype, "path -> zero-area polygon #{poly.bbox}")
+              total_bad += 1
+            end
+          rescue => e
+            report_bad(cell_name, layer, datatype, "path polygonization failed: #{e.message}")
+            total_bad += 1
+          end
+
+        elsif shape.is_polygon?
+          poly = shape.polygon
+
+          if poly.area <= 0
+            report_bad(cell_name, layer, datatype, "zero-area polygon #{poly.bbox}")
+            total_bad += 1
+          end
+
+          pts = 0
+          poly.each_point_hull { pts += 1 }
+          if pts < 3
+            report_bad(cell_name, layer, datatype, "invalid polygon (<3 hull pts) #{poly.bbox}")
+            total_bad += 1
+          end
         end
 
-      elsif shape.is_polygon?
-        poly = shape.polygon
-
-        if poly.area <= 0
-          report_bad(layer, datatype, "zero-area polygon #{poly.bbox}")
-          total_bad += 1
-        end
-
-        pts = 0
-        poly.each_point_hull { pts += 1 }
-        if pts < 3
-          report_bad(layer, datatype, "invalid polygon (<3 hull pts) #{poly.bbox}")
-          total_bad += 1
-        end
+      rescue => e
+        report_bad(cell_name, layer, datatype, "exception: #{e.message}")
+        total_bad += 1
       end
-
-    rescue => e
-      report_bad(layer, datatype, "exception: #{e.message}")
-      total_bad += 1
     end
-
-    iter.next
   end
 end
 

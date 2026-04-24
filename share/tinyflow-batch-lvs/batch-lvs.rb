@@ -142,7 +142,8 @@ cells.each do |cell_name|
     results[:pass] << cell_name
   else
     error_count = lvs_result[:errors].length
-    puts "FAILED - #{error_count} issue(s) - check GUI LVS for details"
+    puts "FAILED - #{error_count} issue(s):"
+    lvs_result[:errors].each { |err| puts "    - #{err}" }
     results[:fail] << { name: cell_name, errors: lvs_result[:errors] }
   end
 end
@@ -156,7 +157,8 @@ results[:pass].each { |c| puts "  #{c}" }
 if results[:fail].any?
   puts "\nFailed: #{results[:fail].length}/#{cells.length}"
   results[:fail].each do |f|
-    puts "  #{f[:name]} - #{f[:errors].length} issue(s) - check GUI LVS for details"
+    puts "  #{f[:name]} - #{f[:errors].length} issue(s):"
+    f[:errors].each { |err| puts "    - #{err}" }
   end
 end
 
