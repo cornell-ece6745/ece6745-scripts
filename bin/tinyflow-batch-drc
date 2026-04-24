@@ -12,11 +12,12 @@ import sys
 import os
 from pathlib import Path
 
-LYDRC = "/classes/ece6745/install/adks/tinyflow-180nm/drc/tinyflow-180nm.lydrc"
+LYDRC = "/home/iw87/ece6745/ece6745-tinyflow/pdk/drc/tinyflow-180nm.lydrc"
 OUTPUT_DIR = "./drc_results/"
 
 SCRIPT_DIR = Path(__file__).parent.absolute()
 BATCH_DRC_RB = SCRIPT_DIR / "../share/tinyflow-batch-drc/batch-drc.rb"
+GEOMETRY_CHECK = SCRIPT_DIR / "../share/tinyflow-batch-drc/geometry-check.rb"
 
 def main():
     if len(sys.argv) != 2:
@@ -50,6 +51,7 @@ def main():
         "-r", str(BATCH_DRC_RB),
         "-rd", f"input={input_path}",
         "-rd", f"drc={LYDRC}",
+        "-rd", f"sanity={GEOMETRY_CHECK}",
         "-rd", f"output_dir={OUTPUT_DIR}"
     ]
 
