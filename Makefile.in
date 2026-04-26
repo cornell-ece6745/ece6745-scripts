@@ -113,6 +113,8 @@ install-shares : $(install_shares)
                    $(DESTDIR)/share/tinyflow-ngspice
 	$(INSTALL_SHARE) $(src_dir)/share/tinyflow-batch-drc/batch-drc.rb \
                    $(DESTDIR)/share/tinyflow-batch-drc
+	$(INSTALL_SHARE) $(src_dir)/share/tinyflow-batch-drc/geometry-check.rb \
+                   $(DESTDIR)/share/tinyflow-batch-drc
 	$(MKINSTALLDIRS) $(DESTDIR)/share/tinyflow-batch-lvs
 	$(INSTALL_SHARE) $(src_dir)/share/tinyflow-batch-lvs/batch-lvs.rb \
                    $(DESTDIR)/share/tinyflow-batch-lvs
