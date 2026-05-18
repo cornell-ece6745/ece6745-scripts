@@ -20,9 +20,8 @@
 # Allows for batch processing
 # 
 #=========================================================================
-# Authors : Vayun Tiwari & Parker Schless
+# Authors : Vayun Tiwari and Parker Schless
 # Date    : May 2026
-
 
 source($input, $top)
 schematic($schematic)

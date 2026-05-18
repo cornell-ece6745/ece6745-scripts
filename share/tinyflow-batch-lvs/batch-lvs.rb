@@ -16,7 +16,7 @@
 #
 # Exit code: 0 if every cell matched, 1 if anything failed or was skipped.
 #
-# Authors : Vayun Tiwari & Parker Schless
+# Authors : Vayun Tiwari and Parker Schless
 # Date    : May 2026
 #=========================================================================
 require 'fileutils'
