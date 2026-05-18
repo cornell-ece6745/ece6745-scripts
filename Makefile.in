@@ -24,6 +24,7 @@ install_etcs = \
 install_shares = \
   $(src_dir)/share/tinyflow-ngspice/tinyflow-ngspice-tb-tmpl.sp \
   $(src_dir)/share/tinyflow-batch-drc/batch-drc.rb \
+  $(src_dir)/share/tinyflow-batch-drc/geometry-check.rb \
   $(src_dir)/share/tinyflow-batch-lvs/batch-lvs.rb \
 
 #-------------------------------------------------------------------------
@@ -111,6 +112,8 @@ install-shares : $(install_shares)
 	$(INSTALL_SHARE) $(src_dir)/share/tinyflow-ngspice/tinyflow-ngspice-tb-tmpl.sp \
                    $(DESTDIR)/share/tinyflow-ngspice
 	$(INSTALL_SHARE) $(src_dir)/share/tinyflow-batch-drc/batch-drc.rb \
+                   $(DESTDIR)/share/tinyflow-batch-drc
+	$(INSTALL_SHARE) $(src_dir)/share/tinyflow-batch-drc/geometry-check.rb \
                    $(DESTDIR)/share/tinyflow-batch-drc
 	$(MKINSTALLDIRS) $(DESTDIR)/share/tinyflow-batch-lvs
 	$(INSTALL_SHARE) $(src_dir)/share/tinyflow-batch-lvs/batch-lvs.rb \
