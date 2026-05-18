@@ -20,8 +20,8 @@
 # Allows for batch processing
 # 
 #=========================================================================
-# Authors : Vayun Tiwari
-# Date    : December 18th, 2025
+# Authors : Vayun Tiwari & Parker Schless
+# Date    : May 2026
 
 
 source($input, $top)
@@ -106,6 +106,9 @@ netlist
 align
 # netlist normalization and device combination, make_top_level_pins, purge, combine_devices, and purge_nets
 netlist.simplify
+# port/net name matching
+schematic.case_sensitive = true
+netlist.case_sensitive = true
 # netlist vs. schematic
 compare
 flag_missing_ports

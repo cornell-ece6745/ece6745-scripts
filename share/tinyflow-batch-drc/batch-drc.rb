@@ -2,8 +2,8 @@
 #=========================================================================
 # Ruby runner for batch DRC on stdcells.gds using KLayout
 #=========================================================================
-# Authors : Vayun Tiwari
-# Date    : January 2026
+# Authors : Vayun Tiwari & Parker Schless
+# Date    : May 2026
 #
 require 'fileutils'
 require 'rexml/document'
