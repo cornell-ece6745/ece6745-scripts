@@ -256,6 +256,20 @@ chmod 600 ~/.ssh/ece6745-github.pub
 chmod 600 ~/.ssh/ece6745-github
 
 #-------------------------------------------------------------------------
+# Create global work dir and local symlink
+#-------------------------------------------------------------------------
+
+print "  - Setting up work dir"
+
+netid=$(whoami)
+target="/classes/ece6745/secure/${netid}"
+
+if [[ ! -e ${HOME}/ece6745 ]]; then
+  mkdir -p "${target}"
+  ln -s "${target}" ${HOME}/ece6745
+fi
+
+#-------------------------------------------------------------------------
 # Always use XFCE
 #-------------------------------------------------------------------------
 
